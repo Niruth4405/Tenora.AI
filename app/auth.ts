@@ -1,0 +1,166 @@
+import NextAuth, { type NextAuthConfig } from "next-auth";
+import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "../app/lib/prisma";
+import bcrypt from "bcryptjs";
+import type { Adapter } from "next-auth/adapters";
+
+function generateUsername(email: string) {
+  return email.split("@")[0] + "_" + Math.floor(1000 + Math.random() * 9000);
+}
+
+const config = {
+  debug: process.env.NODE_ENV === "development", // ← don't log in production
+  trustHost: true,
+
+  adapter: PrismaAdapter(prisma) as Adapter,
+
+  session: {
+    strategy: "jwt",
+  },
+
+  providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+
+    Credentials({
+      name: "Credentials",
+      credentials: {
+        email: {},
+        password: {},
+      },
+
+      async authorize(credentials) {
+        const email = credentials?.email as string;
+        const password = credentials?.password as string;
+
+        if (!email || !password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email },
+        });
+
+        if (!user || !user.passwordHash) return null;
+
+        const isValid = await bcrypt.compare(password, user.passwordHash);
+        if (!isValid) return null;
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          username: user.username,
+        };
+      },
+    }),
+  ],
+
+  pages: {
+    signIn: "/login",
+  },
+
+  callbacks: {
+    async signIn({ user, account }) {
+      if (!user.email) return true;
+
+      const existingUser = await prisma.user.findUnique({
+        where: { email: user.email },
+      });
+
+      if (existingUser) {
+        if (!existingUser.username) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: { username: generateUsername(user.email) },
+          });
+        }
+
+        if (account?.provider !== "credentials" && account) {
+          await prisma.account.upsert({
+            where: {
+              provider_providerAccountId: {
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
+            },
+            update: {},
+            create: {
+              userId: existingUser.id,
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              type: account.type,
+              access_token: account.access_token,
+              id_token: account.id_token,
+              scope: account.scope,
+              token_type: account.token_type,
+            },
+          });
+        }
+
+        (user as any).id = existingUser.id;
+      } else {
+        const newUser = await prisma.user.create({
+          data: {
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            username: generateUsername(user.email),
+          },
+        });
+
+        (user as any).id = newUser.id;
+      }
+
+      return true;
+    },
+
+    // Store username in JWT so session callback never needs a DB call
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = (user as any).id;
+        token.username = (user as any).username;
+      }
+
+      // Handle session.update() calls if needed later
+      if (trigger === "update" && session?.username) {
+        token.username = session.username;
+      }
+
+      return token;
+    },
+
+    // Read from token — NO database query here
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as any).id = token.id;
+        (session.user as any).username = token.username;
+      }
+      return session;
+    },
+
+    // ✅ Fixed redirect — don't intercept callbackUrl blindly
+    async redirect({ url, baseUrl }) {
+      // Allow relative paths
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+
+      // Allow same-origin absolute URLs
+      if (new URL(url).origin === baseUrl) return url;
+
+      // Default fallback
+      return baseUrl;
+    },
+  },
+
+  secret: process.env.NEXTAUTH_SECRET,
+} satisfies NextAuthConfig;
+
+export const {
+  handlers: { GET, POST },
+  auth,
+  signIn,
+  signOut,
+} = NextAuth(config);
