@@ -53,6 +53,8 @@ export default function UserNav({ name, email, image }: UserNavProps) {
           <Image
             src={image}
             alt={name ?? "User"}
+            width={36}
+            height={36}
             className="h-9 w-9 rounded-full object-cover"
           />
         ) : (
@@ -71,7 +73,7 @@ export default function UserNav({ name, email, image }: UserNavProps) {
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-3 w-56 rounded-2xl border border-white/10 bg-[#11161c] p-2 shadow-2xl shadow-black/30">
-          <Link
+          {/* <Link
             href="/dashboard"
             onClick={() => setOpen(false)}
             className="block rounded-xl px-3 py-2 text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
@@ -85,7 +87,17 @@ export default function UserNav({ name, email, image }: UserNavProps) {
             className="block rounded-xl px-3 py-2 text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
           >
             Compose
+          </Link> */}
+
+          <Link
+            href="/settings"
+            onClick={() => setOpen(false)}
+            className="block rounded-xl px-3 py-2 text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
+          >
+            Brand Settings
           </Link>
+
+          <div className="my-1 border-t border-white/[0.06]" />
 
           <button
             type="button"
