@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { generateDrafts } from "@/app/actions/generate-drafts";
 import { saveGeneratedDrafts } from "@/app/actions/save-generated-drafts";
 import type { Platform } from "@/app/lib/ai/types";
@@ -18,17 +17,20 @@ const PLATFORM_OPTIONS: {
   { value: "INSTAGRAM",  label: "Instagram",   icon: "◈",  color: "text-pink-400" },
 ];
 
+const TONE_OPTIONS = ["Professional", "Casual", "Witty", "Authoritative", "Inspirational", "Educational"];
+
 const MIN_WORDS = 50;
 const MAX_WORDS = 800;
 
 export default function ComposePage() {
-  const [update, setUpdate] = useState("");
+  const [context, setContext] = useState("");
+  const [tone, setTone] = useState("");
+  const [requirement, setRequirement] = useState("");
   const [audience, setAudience] = useState("");
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(["LINKEDIN"]);
   const [wordCount, setWordCount] = useState(150);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(["LINKEDIN"]);
   const [result, setResult] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [contextMissing, setContextMissing] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isGenerating, startGenerating] = useTransition();
   const [isSaving, startSaving] = useTransition();
@@ -46,20 +48,20 @@ export default function ComposePage() {
     setMessage(null);
     setSaveMessage(null);
     setResult(null);
-    setContextMissing(false);
 
     startGenerating(async () => {
-      const audienceNote = audience ? `Target audience: ${audience}. ` : "";
+      const composed = [
+        `Context: ${context}`,
+        `Tone: ${tone || "Professional"}`,
+        `Requirement: ${requirement}`,
+        `Target audience: ${audience}`,
+        `Length: approximately ${wordCount} words`,
+      ].join("\n");
+
       const response = await generateDrafts({
-        update: audienceNote + update,
+        update: composed,
         selectedPlatforms,
       });
-
-      // Detect the specific context-missing error
-      if (!response.success && response.error?.toLowerCase().includes("context")) {
-        setContextMissing(true);
-        return;
-      }
 
       setResult(response);
       setMessage(
@@ -78,9 +80,7 @@ export default function ComposePage() {
       .filter(([, output]) => Boolean(output))
       .map(([platform, output]: any) => ({
         platform,
-        draft: Array.isArray(output?.draft)
-          ? output.draft.join("\n")
-          : output?.draft ?? "",
+        draft: Array.isArray(output?.draft) ? output.draft.join("\n") : output?.draft ?? "",
         hashtags: output?.hashtags ?? [],
         notes: output?.notes,
         size: "MEDIUM" as const,
@@ -93,7 +93,7 @@ export default function ComposePage() {
 
     startSaving(async () => {
       const response = await saveGeneratedDrafts({
-        sourceUpdate: update,
+        sourceUpdate: requirement,
         context: audience,
         drafts,
       });
@@ -117,58 +117,120 @@ export default function ComposePage() {
           <p className="mt-1 text-sm text-white/40">Fill in the details below and generate platform-ready drafts.</p>
         </div>
 
-        {/* Context-missing banner */}
-        {contextMissing && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 px-5 py-4">
-            <span className="mt-0.5 text-amber-400">⚠</span>
-            <div>
-              <p className="text-sm font-medium text-amber-400">Brand profile not set up yet</p>
-              <p className="mt-0.5 text-xs text-white/40">
-                The AI needs your brand context to generate content.
-              </p>
-              <Link
-                href="/settings"
-                className="mt-2 inline-block rounded-lg bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-400 hover:bg-amber-400/20 transition-colors"
-              >
-                Set up Brand Profile →
-              </Link>
-            </div>
-          </div>
-        )}
+        <form onSubmit={handleGenerate} className="space-y-4">
 
-        <form onSubmit={handleGenerate} className="space-y-6">
-
-          {/* Step 1 — Context */}
+          {/* 1. Context */}
           <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
-            <StepLabel n={1} title="What do you want to say?" />
+            <StepLabel n={1} title="Context" />
             <textarea
-              value={update}
-              onChange={(e) => setUpdate(e.target.value)}
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
               required
               minLength={8}
-              rows={4}
+              rows={3}
               className="w-full resize-none rounded-xl bg-[#0d1117] border border-white/[0.07] px-4 py-3 text-sm placeholder-white/25 outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/20 transition-all"
-              placeholder="Describe the content, update, or idea you want to create posts about…"
+              placeholder="What is this content about? e.g. We just launched a new CI/CD feature…"
             />
-            <p className="text-xs text-white/30">{update.length} characters · be specific for better results</p>
           </section>
 
-          {/* Step 2 — Audience */}
+          {/* 2. Tone */}
           <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
-            <StepLabel n={2} title="Who is this for?" />
+            <StepLabel n={2} title="Tone" />
+            <div className="flex flex-wrap gap-2">
+              {TONE_OPTIONS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTone((prev) => (prev === t ? "" : t))}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                    tone === t
+                      ? "bg-emerald-400 text-black"
+                      : "bg-white/[0.06] text-white/50 hover:bg-white/10 hover:text-white/80"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* 3. Requirement */}
+          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
+            <StepLabel n={3} title="Requirement" />
+            <textarea
+              value={requirement}
+              onChange={(e) => setRequirement(e.target.value)}
+              required
+              minLength={5}
+              rows={3}
+              className="w-full resize-none rounded-xl bg-[#0d1117] border border-white/[0.07] px-4 py-3 text-sm placeholder-white/25 outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/20 transition-all"
+              placeholder="What should the AI create? e.g. A LinkedIn post announcing the launch with a CTA to try it free…"
+            />
+          </section>
+
+          {/* 4. Targeted Audience */}
+          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
+            <StepLabel n={4} title="Targeted Audience" />
             <input
               type="text"
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
+              required
               className="w-full rounded-xl bg-[#0d1117] border border-white/[0.07] px-4 py-3 text-sm placeholder-white/25 outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/20 transition-all"
-              placeholder="e.g. Early-stage SaaS founders, DevOps engineers, indie hackers…"
+              placeholder="e.g. DevOps engineers, SaaS founders, indie hackers…"
             />
-            <p className="text-xs text-white/30">Specify your target audience to tailor tone and vocabulary.</p>
           </section>
 
-          {/* Step 3 — Platforms */}
-          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
-            <StepLabel n={3} title="Where will you publish?" />
+          {/* 5. Length + Platform */}
+          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-5">
+            <StepLabel n={5} title="Length & Platform" />
+
+            {/* Slider */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-white/30">Short (~{MIN_WORDS}w)</span>
+                <span className="rounded-lg bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-400">~{wordCount} words</span>
+                <span className="text-xs text-white/30">Long (~{MAX_WORDS}w)</span>
+              </div>
+              <div className="relative h-2 w-full rounded-full bg-white/[0.07]">
+                <div
+                  className="absolute left-0 top-0 h-2 rounded-full bg-emerald-400 transition-all"
+                  style={{ width: `${sliderPercent}%` }}
+                />
+                <input
+                  type="range"
+                  min={MIN_WORDS}
+                  max={MAX_WORDS}
+                  step={25}
+                  value={wordCount}
+                  onChange={(e) => setWordCount(Number(e.target.value))}
+                  className="absolute inset-0 w-full cursor-pointer opacity-0"
+                  aria-label="Word count"
+                />
+                <div
+                  className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-emerald-400 bg-[#11161c] shadow transition-all"
+                  style={{ left: `${sliderPercent}%` }}
+                />
+              </div>
+              <div className="flex gap-2">
+                {[75, 150, 300, 500].map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setWordCount(w)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                      wordCount === w
+                        ? "bg-emerald-400 text-black"
+                        : "bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70"
+                    }`}
+                  >
+                    {w}w
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Platform picker */}
             <div className="grid grid-cols-2 gap-2">
               {PLATFORM_OPTIONS.map((p) => {
                 const active = selectedPlatforms.includes(p.value);
@@ -184,9 +246,7 @@ export default function ComposePage() {
                         : "border-white/[0.07] bg-[#0d1117] text-white/40 hover:border-white/20 hover:text-white/70"
                     }`}
                   >
-                    <span className={`text-base font-bold ${active ? p.color : "text-white/30"}`}>
-                      {p.icon}
-                    </span>
+                    <span className={`text-base font-bold ${active ? p.color : "text-white/30"}`}>{p.icon}</span>
                     <span>{p.label}</span>
                     {active && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400" />}
                   </button>
@@ -198,53 +258,7 @@ export default function ComposePage() {
             )}
           </section>
 
-          {/* Step 4 — Word Count Slider */}
-          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-4">
-            <StepLabel n={4} title="How long should the content be?" />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/30">Short (~{MIN_WORDS}w)</span>
-              <span className="rounded-lg bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-400">~{wordCount} words</span>
-              <span className="text-xs text-white/30">Long (~{MAX_WORDS}w)</span>
-            </div>
-            <div className="relative h-2 w-full rounded-full bg-white/[0.07]">
-              <div
-                className="absolute left-0 top-0 h-2 rounded-full bg-emerald-400 transition-all"
-                style={{ width: `${sliderPercent}%` }}
-              />
-              <input
-                type="range"
-                min={MIN_WORDS}
-                max={MAX_WORDS}
-                step={25}
-                value={wordCount}
-                onChange={(e) => setWordCount(Number(e.target.value))}
-                className="absolute inset-0 w-full cursor-pointer opacity-0"
-                aria-label="Word count"
-              />
-              <div
-                className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-emerald-400 bg-[#11161c] shadow transition-all"
-                style={{ left: `${sliderPercent}%` }}
-              />
-            </div>
-            <div className="flex gap-2">
-              {[75, 150, 300, 500].map((w) => (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() => setWordCount(w)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                    wordCount === w
-                      ? "bg-emerald-400 text-black"
-                      : "bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70"
-                  }`}
-                >
-                  {w}w
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* Submit */}
+          {/* Generate */}
           <button
             type="submit"
             disabled={isGenerating || selectedPlatforms.length === 0}
@@ -272,15 +286,10 @@ export default function ComposePage() {
           )}
         </form>
 
-        {/* Results panel */}
+        {/* Results */}
         {result?.success && result.results && (
           <div className="mt-8 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-white">Generated Drafts</h2>
-              {result.creditsAfter !== undefined && result.creditsAfter !== Infinity && (
-                <span className="text-xs text-white/30">{result.creditsAfter} credits remaining</span>
-              )}
-            </div>
+            <h2 className="text-sm font-medium text-white">Generated Drafts</h2>
 
             {Object.entries(result.results).map(([platform, output]: any) => (
               <div key={platform} className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
@@ -298,9 +307,6 @@ export default function ComposePage() {
                       </span>
                     ))}
                   </div>
-                )}
-                {output.notes && (
-                  <p className="text-xs text-white/30 italic">{output.notes}</p>
                 )}
               </div>
             ))}
