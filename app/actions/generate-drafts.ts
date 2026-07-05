@@ -73,13 +73,13 @@ export async function generateDrafts(
 
     const context = toCompanyContext(companyContextRecord);
 
-    if (!context) {
-      return {
-        success: false,
-        status: "ERROR",
-        error: "Company context is missing. Please save your brand details first.",
-      };
-    }
+    // if (!context) {
+    //   return {
+    //     success: false,
+    //     status: "ERROR",
+    //     error: "Company context is missing. Please save your brand details first.",
+    //   };
+    // }
 
     const tier = normalizeTier(subscription?.tier);
     const creditsBefore =
@@ -101,7 +101,7 @@ export async function generateDrafts(
     const outputs = await generatePlatformOutputs({
       rawUpdate: update,
       platforms: selectedPlatforms as Platform[],
-      companyContext: context,
+      companyContext: context ?? undefined,
     });
 
     const results: Partial<Record<Platform, ContentOutput>> = {};

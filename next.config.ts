@@ -1,6 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+        port: "",
+        pathname: "/**",
+      },
+    ],
+  },
+
   async redirects() {
     return [
       {
@@ -10,11 +21,6 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/drafts",
-        destination: "/dashboard",
-        permanent: false,
-      },
-      {
-        source: "/settings",
         destination: "/dashboard",
         permanent: false,
       },
