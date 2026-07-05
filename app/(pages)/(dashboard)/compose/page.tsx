@@ -11,13 +11,25 @@ const PLATFORM_OPTIONS: {
   icon: string;
   color: string;
 }[] = [
-  { value: "LINKEDIN",   label: "LinkedIn",    icon: "in", color: "text-[#0A66C2]" },
-  { value: "TWITTER",    label: "Twitter / X", icon: "𝕏",  color: "text-white" },
-  { value: "NEWSLETTER", label: "Newsletter",  icon: "✉",  color: "text-emerald-400" },
-  { value: "INSTAGRAM",  label: "Instagram",   icon: "◈",  color: "text-pink-400" },
+  { value: "LINKEDIN", label: "LinkedIn", icon: "in", color: "text-[#0A66C2]" },
+  { value: "TWITTER", label: "Twitter / X", icon: "𝕏", color: "text-white" },
+  {
+    value: "NEWSLETTER",
+    label: "Newsletter",
+    icon: "✉",
+    color: "text-emerald-400",
+  },
+  { value: "INSTAGRAM", label: "Instagram", icon: "◈", color: "text-pink-400" },
 ];
 
-const TONE_OPTIONS = ["Professional", "Casual", "Witty", "Authoritative", "Inspirational", "Educational"];
+const TONE_OPTIONS = [
+  "Professional",
+  "Casual",
+  "Witty",
+  "Authoritative",
+  "Inspirational",
+  "Educational",
+];
 
 const MIN_WORDS = 50;
 const MAX_WORDS = 800;
@@ -28,7 +40,9 @@ export default function ComposePage() {
   const [requirement, setRequirement] = useState("");
   const [audience, setAudience] = useState("");
   const [wordCount, setWordCount] = useState(150);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(["LINKEDIN"]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([
+    "LINKEDIN",
+  ]);
   const [result, setResult] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -39,7 +53,7 @@ export default function ComposePage() {
     setSelectedPlatforms((prev) =>
       prev.includes(platform)
         ? prev.filter((p) => p !== platform)
-        : [...prev, platform]
+        : [...prev, platform],
     );
   }
 
@@ -67,7 +81,7 @@ export default function ComposePage() {
       setMessage(
         response.success
           ? "Drafts generated successfully."
-          : (response.error ?? "Failed to generate drafts.")
+          : (response.error ?? "Failed to generate drafts."),
       );
     });
   }
@@ -80,7 +94,9 @@ export default function ComposePage() {
       .filter(([, output]) => Boolean(output))
       .map(([platform, output]: any) => ({
         platform,
-        draft: Array.isArray(output?.draft) ? output.draft.join("\n") : output?.draft ?? "",
+        draft: Array.isArray(output?.draft)
+          ? output.draft.join("\n")
+          : (output?.draft ?? ""),
         hashtags: output?.hashtags ?? [],
         notes: output?.notes,
         size: "MEDIUM" as const,
@@ -94,31 +110,31 @@ export default function ComposePage() {
     startSaving(async () => {
       const response = await saveGeneratedDrafts({
         sourceUpdate: requirement,
-        context: audience,
         drafts,
       });
       setSaveMessage(
         response.success
           ? `Saved ${response.savedCount} draft(s).`
-          : (response.error ?? "Failed to save drafts.")
+          : (response.error ?? "Failed to save drafts."),
       );
     });
   }
 
-  const sliderPercent = ((wordCount - MIN_WORDS) / (MAX_WORDS - MIN_WORDS)) * 100;
+  const sliderPercent =
+    ((wordCount - MIN_WORDS) / (MAX_WORDS - MIN_WORDS)) * 100;
 
   return (
     <main className="min-h-screen bg-[#0b0f14] px-4 py-10 text-white">
       <div className="mx-auto max-w-2xl">
-
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight">Compose</h1>
-          <p className="mt-1 text-sm text-white/40">Fill in the details below and generate platform-ready drafts.</p>
+          <p className="mt-1 text-sm text-white/40">
+            Fill in the details below and generate platform-ready drafts.
+          </p>
         </div>
 
         <form onSubmit={handleGenerate} className="space-y-4">
-
           {/* 1. Context */}
           <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
             <StepLabel n={1} title="Context" />
@@ -188,9 +204,15 @@ export default function ComposePage() {
             {/* Slider */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white/30">Short (~{MIN_WORDS}w)</span>
-                <span className="rounded-lg bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-400">~{wordCount} words</span>
-                <span className="text-xs text-white/30">Long (~{MAX_WORDS}w)</span>
+                <span className="text-xs text-white/30">
+                  Short (~{MIN_WORDS}w)
+                </span>
+                <span className="rounded-lg bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-400">
+                  ~{wordCount} words
+                </span>
+                <span className="text-xs text-white/30">
+                  Long (~{MAX_WORDS}w)
+                </span>
               </div>
               <div className="relative h-2 w-full rounded-full bg-white/[0.07]">
                 <div
@@ -246,15 +268,23 @@ export default function ComposePage() {
                         : "border-white/[0.07] bg-[#0d1117] text-white/40 hover:border-white/20 hover:text-white/70"
                     }`}
                   >
-                    <span className={`text-base font-bold ${active ? p.color : "text-white/30"}`}>{p.icon}</span>
+                    <span
+                      className={`text-base font-bold ${active ? p.color : "text-white/30"}`}
+                    >
+                      {p.icon}
+                    </span>
                     <span>{p.label}</span>
-                    {active && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400" />}
+                    {active && (
+                      <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400" />
+                    )}
                   </button>
                 );
               })}
             </div>
             {selectedPlatforms.length === 0 && (
-              <p className="text-xs text-red-400/80">Select at least one platform.</p>
+              <p className="text-xs text-red-400/80">
+                Select at least one platform.
+              </p>
             )}
           </section>
 
@@ -266,9 +296,24 @@ export default function ComposePage() {
           >
             {isGenerating ? (
               <span className="flex items-center justify-center gap-2">
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 Generating…
               </span>
@@ -278,9 +323,13 @@ export default function ComposePage() {
           </button>
 
           {message && (
-            <p className={`rounded-xl px-4 py-3 text-sm ${
-              result?.success ? "bg-emerald-400/10 text-emerald-400" : "bg-red-400/10 text-red-400"
-            }`}>
+            <p
+              className={`rounded-xl px-4 py-3 text-sm ${
+                result?.success
+                  ? "bg-emerald-400/10 text-emerald-400"
+                  : "bg-red-400/10 text-red-400"
+              }`}
+            >
               {message}
             </p>
           )}
@@ -292,17 +341,25 @@ export default function ComposePage() {
             <h2 className="text-sm font-medium text-white">Generated Drafts</h2>
 
             {Object.entries(result.results).map(([platform, output]: any) => (
-              <div key={platform} className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
+              <div
+                key={platform}
+                className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3"
+              >
                 <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-semibold text-white/60">
                   {platform}
                 </span>
                 <p className="whitespace-pre-wrap text-sm text-white/80 leading-relaxed">
-                  {Array.isArray(output.draft) ? output.draft.join("\n") : output.draft}
+                  {Array.isArray(output.draft)
+                    ? output.draft.join("\n")
+                    : output.draft}
                 </p>
                 {output.hashtags?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {output.hashtags.map((tag: string) => (
-                      <span key={tag} className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs text-emerald-400">
+                      <span
+                        key={tag}
+                        className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs text-emerald-400"
+                      >
                         #{tag}
                       </span>
                     ))}
@@ -321,7 +378,9 @@ export default function ComposePage() {
             </button>
 
             {saveMessage && (
-              <p className="rounded-xl bg-white/[0.04] px-4 py-3 text-sm text-white/50">{saveMessage}</p>
+              <p className="rounded-xl bg-white/[0.04] px-4 py-3 text-sm text-white/50">
+                {saveMessage}
+              </p>
             )}
           </div>
         )}
