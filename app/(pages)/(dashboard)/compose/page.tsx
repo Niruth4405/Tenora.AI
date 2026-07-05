@@ -1,255 +1,204 @@
 "use client";
 
 import { useState, useTransition } from "react";
-
 import { generateDrafts } from "@/app/actions/generate-drafts";
 import { saveGeneratedDrafts } from "@/app/actions/save-generated-drafts";
-
 import type { Platform } from "@/app/lib/ai/types";
-import type { ContentSize } from "@prisma/client";
 
-const PLATFORM_OPTIONS: Platform[] = [
-  "TWITTER",
-  "LINKEDIN",
-  "INSTAGRAM",
-  "NEWSLETTER",
-];
-
-const DEFAULT_TAGS = [
-  "direct",
-  "minimal",
-  "technical",
-  "founder-led",
-];
-
-const SIZE_OPTIONS: {
+const PLATFORM_OPTIONS: {
+  value: Platform;
   label: string;
-  value: ContentSize;
-  words: number;
+  icon: string;
+  color: string;
 }[] = [
-  {
-    label: "Small",
-    value: "SMALL",
-    words: 75,
-  },
-  {
-    label: "Medium",
-    value: "MEDIUM",
-    words: 150,
-  },
-  {
-    label: "Large",
-    value: "LARGE",
-    words: 300,
-  },
-  {
-    label: "Custom",
-    value: "CUSTOM",
-    words: 0,
-  },
+  { value: "LINKEDIN",   label: "LinkedIn",      icon: "in", color: "text-[#0A66C2]" },
+  { value: "TWITTER",    label: "Twitter / X",   icon: "𝕏",  color: "text-white" },
+  { value: "NEWSLETTER", label: "Newsletter",    icon: "✉",  color: "text-emerald-400" },
+  { value: "INSTAGRAM",  label: "Instagram",     icon: "◈",  color: "text-pink-400" },
 ];
+
+const MIN_WORDS = 50;
+const MAX_WORDS = 800;
 
 export default function ComposePage() {
   const [update, setUpdate] = useState("");
-  const [context, setContext] = useState("");
-
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([
-    "TWITTER",
-  ]);
-
-  const [selectedTags, setSelectedTags] =
-    useState<string[]>(DEFAULT_TAGS);
-
-  const [selectedSize, setSelectedSize] =
-    useState<ContentSize>("MEDIUM");
-
-  const [customWordLimit, setCustomWordLimit] =
-    useState<number>(500);
-
+  const [audience, setAudience] = useState("");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(["LINKEDIN"]);
+  const [wordCount, setWordCount] = useState(150);
   const [result, setResult] = useState<any>(null);
-
   const [message, setMessage] = useState<string | null>(null);
-
-  const [saveMessage, setSaveMessage] =
-    useState<string | null>(null);
-
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isGenerating, startGenerating] = useTransition();
-
   const [isSaving, startSaving] = useTransition();
 
   function togglePlatform(platform: Platform) {
     setSelectedPlatforms((prev) =>
       prev.includes(platform)
         ? prev.filter((p) => p !== platform)
-        : [...prev, platform],
+        : [...prev, platform]
     );
   }
 
-  function toggleTag(tag: string) {
-    setSelectedTags((prev) =>
-      prev.includes(tag)
-        ? prev.filter((t) => t !== tag)
-        : [...prev, tag],
-    );
-  }
-
-  function handleGenerate(
-    e: React.FormEvent<HTMLFormElement>,
-  ) {
+  function handleGenerate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
-    setMessage(null);
-    setSaveMessage(null);
-    setResult(null);
-
+    setMessage(null); setSaveMessage(null); setResult(null);
     startGenerating(async () => {
+      const audienceNote = audience ? `Target audience: ${audience}. ` : "";
       const response = await generateDrafts({
-        update,
-        context,
+        update: audienceNote + update,
         selectedPlatforms,
-        selectedTags,
-        size: selectedSize,
-        customWordCount:
-          selectedSize === "CUSTOM"
-            ? customWordLimit
-            : undefined,
       });
-
       setResult(response);
-
-      if (!response.success) {
-        setMessage(
-          response.error ?? "Failed to generate drafts.",
-        );
-        return;
-      }
-
-      setMessage("Drafts generated successfully.");
+      setMessage(response.success ? "Drafts generated successfully." : (response.error ?? "Failed to generate drafts."));
     });
   }
 
-  function handleSaveDrafts() {
-    if (!result?.results) return;
-
-    setSaveMessage(null);
-
-    const drafts = Object.entries(result.results)
-      .filter(([, output]) => Boolean(output))
-      .map(([platform, output]: any) => ({
-        platform,
-        draft: Array.isArray(output?.draft)
-          ? output.draft.join("\n")
-          : output?.draft ?? "",
-        hashtags: output?.hashtags ?? [],
-        notes: output?.notes,
-        size: selectedSize,
-        customWordCount:
-          selectedSize === "CUSTOM"
-            ? customWordLimit
-            : undefined,
-      }));
-
-    if (drafts.length === 0) {
-      setSaveMessage("No drafts available to save.");
-      return;
-    }
-
-    startSaving(async () => {
-      const response = await saveGeneratedDrafts({
-        sourceUpdate: update,
-        context,
-        drafts,
-      });
-
-      if (!response.success) {
-        setSaveMessage(
-          response.error ?? "Failed to save drafts.",
-        );
-        return;
-      }
-
-      setSaveMessage(
-        `Saved ${response.savedCount} draft(s).`,
-      );
-    });
-  }
+  const sliderPercent = ((wordCount - MIN_WORDS) / (MAX_WORDS - MIN_WORDS)) * 100;
 
   return (
-    <main className="min-h-screen bg-[#0b0f14] p-6 text-white">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <form
-          onSubmit={handleGenerate}
-          className="space-y-6"
-        >
-          <textarea
-            value={update}
-            onChange={(e) => setUpdate(e.target.value)}
-            className="w-full rounded-2xl bg-[#11161c] p-4"
-            placeholder="Raw update"
-          />
+    <main className="min-h-screen bg-[#0b0f14] px-4 py-10 text-white">
+      <div className="mx-auto max-w-2xl">
 
-          <textarea
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            className="w-full rounded-2xl bg-[#11161c] p-4"
-            placeholder="Context"
-          />
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">Compose</h1>
+          <p className="mt-1 text-sm text-white/40">Fill in the details below and generate platform-ready drafts.</p>
+        </div>
 
-          <div className="flex flex-wrap gap-3">
-            {SIZE_OPTIONS.map((size) => {
-              const active =
-                selectedSize === size.value;
+        <form onSubmit={handleGenerate} className="space-y-6">
 
-              return (
-                <button
-                  key={size.value}
-                  type="button"
-                  onClick={() =>
-                    setSelectedSize(size.value)
-                  }
-                  className={`rounded-full px-4 py-2 ${
-                    active
-                      ? "bg-emerald-400 text-black"
-                      : "bg-[#11161c]"
+          {/* Step 1 — Context */}
+          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
+            <StepLabel n={1} title="What do you want to say?" />
+            <textarea
+              value={update}
+              onChange={(e) => setUpdate(e.target.value)}
+              required minLength={8} rows={4}
+              className="w-full resize-none rounded-xl bg-[#0d1117] border border-white/[0.07] px-4 py-3 text-sm placeholder-white/25 outline-none focus:border-emerald-400/50 transition-all"
+              placeholder="Describe the content, update, or idea you want to create posts about…"
+            />
+            <p className="text-xs text-white/30">{update.length} characters · be specific for better results</p>
+          </section>
+
+          {/* Step 2 — Audience */}
+          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
+            <StepLabel n={2} title="Who is this for?" />
+            <input
+              type="text"
+              value={audience}
+              onChange={(e) => setAudience(e.target.value)}
+              className="w-full rounded-xl bg-[#0d1117] border border-white/[0.07] px-4 py-3 text-sm placeholder-white/25 outline-none focus:border-emerald-400/50 transition-all"
+              placeholder="e.g. Early-stage SaaS founders, DevOps engineers, indie hackers…"
+            />
+            <p className="text-xs text-white/30">Specify your target audience to tailor tone and vocabulary.</p>
+          </section>
+
+          {/* Step 3 — Platforms */}
+          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
+            <StepLabel n={3} title="Where will you publish?" />
+            <div className="grid grid-cols-2 gap-2">
+              {PLATFORM_OPTIONS.map((p) => {
+                const active = selectedPlatforms.includes(p.value);
+                return (
+                  <button key={p.value} type="button"
+                    onClick={() => togglePlatform(p.value)} aria-pressed={active}
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all ${
+                      active
+                        ? "border-emerald-400/50 bg-emerald-400/10 text-white"
+                        : "border-white/[0.07] bg-[#0d1117] text-white/40 hover:border-white/20 hover:text-white/70"
+                    }`}
+                  >
+                    <span className={`text-base font-bold ${active ? p.color : "text-white/30"}`}>{p.icon}</span>
+                    <span>{p.label}</span>
+                    {active && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400" />}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedPlatforms.length === 0 && <p className="text-xs text-red-400/80">Select at least one platform.</p>}
+          </section>
+
+          {/* Step 4 — Word Count Slider */}
+          <section className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-4">
+            <StepLabel n={4} title="How long should the content be?" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-white/30">Short (~{MIN_WORDS}w)</span>
+              <span className="rounded-lg bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-400">~{wordCount} words</span>
+              <span className="text-xs text-white/30">Long (~{MAX_WORDS}w)</span>
+            </div>
+            {/* Track + thumb */}
+            <div className="relative h-2 w-full rounded-full bg-white/[0.07]">
+              <div className="absolute left-0 top-0 h-2 rounded-full bg-emerald-400 transition-all" style={{ width: `${sliderPercent}%` }} />
+              <input type="range" min={MIN_WORDS} max={MAX_WORDS} step={25} value={wordCount}
+                onChange={(e) => setWordCount(Number(e.target.value))}
+                className="absolute inset-0 w-full cursor-pointer opacity-0" aria-label="Word count" />
+              <div className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-emerald-400 bg-[#11161c] shadow transition-all" style={{ left: `${sliderPercent}%` }} />
+            </div>
+            {/* Preset chips */}
+            <div className="flex gap-2">
+              {[75, 150, 300, 500].map((w) => (
+                <button key={w} type="button" onClick={() => setWordCount(w)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                    wordCount === w ? "bg-emerald-400 text-black" : "bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70"
                   }`}
                 >
-                  {size.label}
+                  {w}w
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </section>
 
-          {selectedSize === "CUSTOM" && (
-            <input
-              type="number"
-              value={customWordLimit}
-              onChange={(e) =>
-                setCustomWordLimit(
-                  Number(e.target.value),
-                )
-              }
-              className="w-full rounded-2xl bg-[#11161c] p-4"
-              placeholder="Custom word limit"
-            />
-          )}
-
-          <button
-            type="submit"
-            disabled={isGenerating}
-            className="rounded-2xl bg-emerald-400 px-6 py-3 font-semibold text-black"
+          {/* Submit */}
+          <button type="submit" disabled={isGenerating || selectedPlatforms.length === 0}
+            className="w-full rounded-2xl bg-emerald-400 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isGenerating
-              ? "Generating..."
-              : "Generate"}
+            {isGenerating ? "Generating…" : `Generate ${selectedPlatforms.length} Draft${selectedPlatforms.length !== 1 ? "s" : ""}`}
           </button>
 
           {message && (
-            <p className="text-sm text-white/70">
+            <p className={`rounded-xl px-4 py-3 text-sm ${result?.success ? "bg-emerald-400/10 text-emerald-400" : "bg-red-400/10 text-red-400"}`}>
               {message}
             </p>
           )}
         </form>
+
+        {/* Results panel */}
+        {result?.success && result.results && (
+          <div className="mt-8 space-y-4">
+            <h2 className="text-sm font-medium text-white">Generated Drafts</h2>
+            {Object.entries(result.results).map(([platform, output]: any) => (
+              <div key={platform} className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
+                <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-semibold text-white/60">{platform}</span>
+                <p className="whitespace-pre-wrap text-sm text-white/80 leading-relaxed">
+                  {Array.isArray(output.draft) ? output.draft.join("\n") : output.draft}
+                </p>
+                {output.hashtags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {output.hashtags.map((tag: string) => (
+                      <span key={tag} className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs text-emerald-400">#{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            <button type="button" onClick={handleSaveDrafts} disabled={isSaving}
+              className="w-full rounded-2xl border border-emerald-400/30 bg-emerald-400/5 py-3.5 text-sm font-semibold text-emerald-400 hover:bg-emerald-400/10 disabled:opacity-50"
+            >
+              {isSaving ? "Saving…" : "Save All Drafts"}
+            </button>
+            {saveMessage && <p className="rounded-xl bg-white/[0.04] px-4 py-3 text-sm text-white/50">{saveMessage}</p>}
+          </div>
+        )}
       </div>
     </main>
+  );
+}
+
+function StepLabel({ n, title }: { n: number; title: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/10 text-xs font-semibold text-emerald-400">{n}</span>
+      <h2 className="text-sm font-medium text-white">{title}</h2>
+    </div>
   );
 }
