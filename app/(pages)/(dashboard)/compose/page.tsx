@@ -1,165 +1,255 @@
-import AppShell from "../../../components/layout/app-shell";
+"use client";
 
-const OUTPUTS = [
+import { useState, useTransition } from "react";
+
+import { generateDrafts } from "@/app/actions/generate-drafts";
+import { saveGeneratedDrafts } from "@/app/actions/save-generated-drafts";
+
+import type { Platform } from "@/app/lib/ai/types";
+import type { ContentSize } from "@prisma/client";
+
+const PLATFORM_OPTIONS: Platform[] = [
+  "TWITTER",
+  "LINKEDIN",
+  "INSTAGRAM",
+  "NEWSLETTER",
+];
+
+const DEFAULT_TAGS = [
+  "direct",
+  "minimal",
+  "technical",
+  "founder-led",
+];
+
+const SIZE_OPTIONS: {
+  label: string;
+  value: ContentSize;
+  words: number;
+}[] = [
   {
-    platform: "LinkedIn",
-    copy: "We just launched dark mode in Tenora. It now follows system preference automatically, which means a smoother experience for teams working late or switching between devices throughout the day.",
+    label: "Small",
+    value: "SMALL",
+    words: 75,
   },
   {
-    platform: "Twitter",
-    copy: "We shipped dark mode for Tenora.\n\nNo toggle hunting.\nNo extra setup.\nIt follows your system preference automatically.\n\nSmall change, much better feel.",
+    label: "Medium",
+    value: "MEDIUM",
+    words: 150,
   },
   {
-    platform: "Instagram",
-    copy: "Dark mode is now live in Tenora ✨\n\nIt follows your system preference automatically, so your workspace feels right the moment you open it.\n\nSmall product changes like this make day-to-day work smoother.",
+    label: "Large",
+    value: "LARGE",
+    words: 300,
   },
   {
-    platform: "Newsletter",
-    copy: "This week we rolled out dark mode in Tenora. It automatically follows system preference, making the product feel more natural across different devices and work setups.",
+    label: "Custom",
+    value: "CUSTOM",
+    words: 0,
   },
 ];
 
-const TAGS = ["direct", "minimal", "technical", "founder-led"];
-
 export default function ComposePage() {
+  const [update, setUpdate] = useState("");
+  const [context, setContext] = useState("");
+
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([
+    "TWITTER",
+  ]);
+
+  const [selectedTags, setSelectedTags] =
+    useState<string[]>(DEFAULT_TAGS);
+
+  const [selectedSize, setSelectedSize] =
+    useState<ContentSize>("MEDIUM");
+
+  const [customWordLimit, setCustomWordLimit] =
+    useState<number>(500);
+
+  const [result, setResult] = useState<any>(null);
+
+  const [message, setMessage] = useState<string | null>(null);
+
+  const [saveMessage, setSaveMessage] =
+    useState<string | null>(null);
+
+  const [isGenerating, startGenerating] = useTransition();
+
+  const [isSaving, startSaving] = useTransition();
+
+  function togglePlatform(platform: Platform) {
+    setSelectedPlatforms((prev) =>
+      prev.includes(platform)
+        ? prev.filter((p) => p !== platform)
+        : [...prev, platform],
+    );
+  }
+
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tag)
+        ? prev.filter((t) => t !== tag)
+        : [...prev, tag],
+    );
+  }
+
+  function handleGenerate(
+    e: React.FormEvent<HTMLFormElement>,
+  ) {
+    e.preventDefault();
+
+    setMessage(null);
+    setSaveMessage(null);
+    setResult(null);
+
+    startGenerating(async () => {
+      const response = await generateDrafts({
+        update,
+        context,
+        selectedPlatforms,
+        selectedTags,
+        size: selectedSize,
+        customWordCount:
+          selectedSize === "CUSTOM"
+            ? customWordLimit
+            : undefined,
+      });
+
+      setResult(response);
+
+      if (!response.success) {
+        setMessage(
+          response.error ?? "Failed to generate drafts.",
+        );
+        return;
+      }
+
+      setMessage("Drafts generated successfully.");
+    });
+  }
+
+  function handleSaveDrafts() {
+    if (!result?.results) return;
+
+    setSaveMessage(null);
+
+    const drafts = Object.entries(result.results)
+      .filter(([, output]) => Boolean(output))
+      .map(([platform, output]: any) => ({
+        platform,
+        draft: Array.isArray(output?.draft)
+          ? output.draft.join("\n")
+          : output?.draft ?? "",
+        hashtags: output?.hashtags ?? [],
+        notes: output?.notes,
+        size: selectedSize,
+        customWordCount:
+          selectedSize === "CUSTOM"
+            ? customWordLimit
+            : undefined,
+      }));
+
+    if (drafts.length === 0) {
+      setSaveMessage("No drafts available to save.");
+      return;
+    }
+
+    startSaving(async () => {
+      const response = await saveGeneratedDrafts({
+        sourceUpdate: update,
+        context,
+        drafts,
+      });
+
+      if (!response.success) {
+        setSaveMessage(
+          response.error ?? "Failed to save drafts.",
+        );
+        return;
+      }
+
+      setSaveMessage(
+        `Saved ${response.savedCount} draft(s).`,
+      );
+    });
+  }
+
   return (
-    <AppShell
-      title="Compose"
-      subtitle="Turn a raw update into polished drafts, review every output, and copy or post directly from one workspace."
-    >
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <section className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-xl font-semibold">Input Context</h2>
-            <p className="mt-2 text-sm text-white/55">
-              Add the update, product context, and brand direction for generation.
-            </p>
+    <main className="min-h-screen bg-[#0b0f14] p-6 text-white">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <form
+          onSubmit={handleGenerate}
+          className="space-y-6"
+        >
+          <textarea
+            value={update}
+            onChange={(e) => setUpdate(e.target.value)}
+            className="w-full rounded-2xl bg-[#11161c] p-4"
+            placeholder="Raw update"
+          />
 
-            <div className="mt-6 space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-white/75">
-                  Raw Update
-                </label>
-                <textarea
-                  className="min-h-36 w-full rounded-2xl border border-white/10 bg-[#11161c] px-4 py-3 text-sm text-white outline-none placeholder:text-white/25"
-                  placeholder="We launched dark mode today. It follows system preference automatically and is live for all users."
-                />
-              </div>
+          <textarea
+            value={context}
+            onChange={(e) => setContext(e.target.value)}
+            className="w-full rounded-2xl bg-[#11161c] p-4"
+            placeholder="Context"
+          />
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-white/75">
-                  Product / Audience Context
-                </label>
-                <textarea
-                  className="min-h-28 w-full rounded-2xl border border-white/10 bg-[#11161c] px-4 py-3 text-sm text-white outline-none placeholder:text-white/25"
-                  placeholder="Tenora helps startups and lean teams generate multi-platform content from a single update."
-                />
-              </div>
+          <div className="flex flex-wrap gap-3">
+            {SIZE_OPTIONS.map((size) => {
+              const active =
+                selectedSize === size.value;
 
-              <div>
-                <label className="mb-3 block text-sm font-medium text-white/75">
-                  Brand Voice Tags
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {TAGS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-300 transition hover:bg-emerald-400/15"
-                    >
-                      #{tag}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="rounded-full border border-dashed border-white/15 px-4 py-2 text-sm text-white/45 transition hover:bg-white/5 hover:text-white"
-                  >
-                    + Add tag
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-3 block text-sm font-medium text-white/75">
-                  Platforms
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {["LinkedIn", "Twitter", "Instagram", "Newsletter"].map(
-                    (platform) => (
-                      <button
-                        key={platform}
-                        type="button"
-                        className="rounded-full border border-white/10 bg-[#11161c] px-4 py-2 text-sm text-white/75 transition hover:bg-white/5 hover:text-white"
-                      >
-                        {platform}
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-
-              <button className="w-full rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-300">
-                Generate outputs
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Generated Outputs</h2>
-                <p className="mt-2 text-sm text-white/55">
-                  Review the drafts, copy them, or send them into your posting flow.
-                </p>
-              </div>
-
-              <button className="rounded-2xl border border-white/10 px-4 py-2 text-sm text-white/75 transition hover:bg-white/5 hover:text-white">
-                Regenerate
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {OUTPUTS.map((output) => (
-                <div
-                  key={output.platform}
-                  className="rounded-2xl border border-white/10 bg-[#11161c] p-5"
+              return (
+                <button
+                  key={size.value}
+                  type="button"
+                  onClick={() =>
+                    setSelectedSize(size.value)
+                  }
+                  className={`rounded-full px-4 py-2 ${
+                    active
+                      ? "bg-emerald-400 text-black"
+                      : "bg-[#11161c]"
+                  }`}
                 >
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-emerald-300">{output.platform}</p>
-                      <h3 className="mt-1 text-base font-medium text-white">
-                        Ready-to-post draft
-                      </h3>
-                    </div>
-
-                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50">
-                      Draft
-                    </span>
-                  </div>
-
-                  <p className="whitespace-pre-line text-sm leading-7 text-white/75">
-                    {output.copy}
-                  </p>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-emerald-300">
-                      Copy draft
-                    </button>
-                    <button className="rounded-2xl border border-white/10 px-4 py-2 text-sm text-white/75 transition hover:bg-white/5 hover:text-white">
-                      Post now
-                    </button>
-                    <button className="rounded-2xl border border-white/10 px-4 py-2 text-sm text-white/75 transition hover:bg-white/5 hover:text-white">
-                      Save output
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  {size.label}
+                </button>
+              );
+            })}
           </div>
-        </section>
+
+          {selectedSize === "CUSTOM" && (
+            <input
+              type="number"
+              value={customWordLimit}
+              onChange={(e) =>
+                setCustomWordLimit(
+                  Number(e.target.value),
+                )
+              }
+              className="w-full rounded-2xl bg-[#11161c] p-4"
+              placeholder="Custom word limit"
+            />
+          )}
+
+          <button
+            type="submit"
+            disabled={isGenerating}
+            className="rounded-2xl bg-emerald-400 px-6 py-3 font-semibold text-black"
+          >
+            {isGenerating
+              ? "Generating..."
+              : "Generate"}
+          </button>
+
+          {message && (
+            <p className="text-sm text-white/70">
+              {message}
+            </p>
+          )}
+        </form>
       </div>
-    </AppShell>
+    </main>
   );
 }

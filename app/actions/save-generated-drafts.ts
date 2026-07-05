@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { auth } from "../auth";
 import { prisma } from "../lib/prisma";
-import type { Platform } from "@/app/lib/ai/generate";
+
 
 const DraftSchema = z.object({
   platform: z.enum(["TWITTER", "LINKEDIN", "INSTAGRAM", "NEWSLETTER"] as const),
@@ -34,7 +34,7 @@ export async function saveGeneratedDrafts(
     if (!session?.user?.id) {
       return { success: false, error: "Unauthorized." };
     }
-
+   const userId = session.user.id;
     const parsed = SaveGeneratedDraftsSchema.safeParse(input);
 
     if (!parsed.success) {
@@ -48,7 +48,7 @@ export async function saveGeneratedDrafts(
 
     await prisma.contentDraft.createMany({
       data: drafts.map((item) => ({
-        userId: session.user.id,
+        userId: userId,
         platform: item.platform,
         sourceUpdate,
         draft: item.draft,

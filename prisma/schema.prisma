@@ -7,26 +7,62 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PlanTier {
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INCOMPLETE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+enum DraftStatus {
+  DRAFT
+  READY
+  PUBLISHED
+  FAILED
+}
+
+enum SocialPlatform {
+  LINKEDIN
+  TWITTER
+  INSTAGRAM
+  NEWSLETTER
+}
+
+enum ContentSize {
+  SMALL
+  MEDIUM
+  LARGE
+  CUSTOM
+}
+
 model User {
-  id                String             @id @default(auto()) @map("_id") @db.ObjectId
-  name              String?
-  username          String?            @unique
-  email             String?            @unique
-  emailVerified     DateTime?
-  image             String?
-  passwordHash      String?
+  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
+  name               String?
+  username           String?           @unique
+  email              String?           @unique
+  emailVerified      DateTime?
+  image              String?
+  passwordHash       String?
 
-  companyContext    CompanyContext?
-  subscription      Subscription?
-  contentDrafts     ContentDraft[]
-  passwordResetOtps PasswordResetOtp[]
+  companyContext     CompanyContext?
+  subscription       Subscription?
+  contentDrafts      ContentDraft[]
+  generatedPosts     GeneratedPost[]
+  passwordResetOtps  PasswordResetOtp[]
 
-  accounts          Account[]
-  sessions          Session[]
-  authenticators    Authenticator[]
+  accounts           Account[]
+  sessions           Session[]
+  authenticators     Authenticator[]
 
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 }
 
 model CompanyContext {
@@ -44,88 +80,195 @@ model CompanyContext {
 }
 
 model Subscription {
-  id               String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId           String    @unique @db.ObjectId
-  tier             String    @default("STARTER")
-  creditsRemaining Int       @default(0)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                    String              @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String              @unique @db.ObjectId
 
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier                  PlanTier            @default(BASIC)
+  status                SubscriptionStatus  @default(ACTIVE)
+
+  creditsRemaining      Int                 @default(30)
+  creditsUsedThisMonth  Int                 @default(0)
+  creditsResetAt        DateTime?
+
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  stripePriceId         String?
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tier])
+  @@index([status])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model ContentDraft {
-  id           String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String    @db.ObjectId
-  platform     String
-  sourceUpdate String
-  draft        String
-  hashtags     String[]
-  notes        String?
-  status       String    @default("DRAFT")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String          @db.ObjectId
 
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform        SocialPlatform
+  size            ContentSize     @default(MEDIUM)
+
+  sourceUpdate    String
+  context         String?
+  draft           String
+  editedDraft     String?
+  hashtags        String[]
+  voiceTags       String[]
+  notes           String?
+  customWordCount Int?
+
+  estimatedWords  Int?
+  actualWords     Int?
+
+  status          DraftStatus     @default(DRAFT)
+  externalPostId  String?
+  externalUrl     String?
+  publishedAt     DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analytics       PostAnalytics?
+
+  @@index([userId, platform])
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+model GeneratedPost {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String          @db.ObjectId
+
+  platform        SocialPlatform
+  size            ContentSize     @default(MEDIUM)
+
+  sourceUpdate    String
+  context         String?
+  content         String
+  editedContent   String?
+  voiceTags       String[]
+  hashtags        String[]
+  customWordCount Int?
+
+  estimatedWords  Int?
+  actualWords     Int?
+
+  status          DraftStatus     @default(DRAFT)
+  externalPostId  String?
+  externalUrl     String?
+  publishedAt     DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analytics       GeneratedPostAnalytics?
+
+  @@index([userId, platform])
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+model PostAnalytics {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  contentDraftId  String          @unique @db.ObjectId
+
+  impressions     Int             @default(0)
+  engagement      Int             @default(0)
+  clicks          Int             @default(0)
+  shares          Int             @default(0)
+  comments        Int             @default(0)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  contentDraft    ContentDraft    @relation(fields: [contentDraftId], references: [id], onDelete: Cascade)
+}
+
+model GeneratedPostAnalytics {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  generatedPostId  String         @unique @db.ObjectId
+
+  impressions      Int            @default(0)
+  engagement       Int            @default(0)
+  clicks           Int            @default(0)
+  shares           Int            @default(0)
+  comments         Int            @default(0)
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  generatedPost    GeneratedPost  @relation(fields: [generatedPostId], references: [id], onDelete: Cascade)
 }
 
 model PasswordResetOtp {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
-  email     String
-  otpHash   String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  attempts  Int      @default(0)
-  createdAt DateTime @default(now())
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String    @db.ObjectId
+  email      String
+  otpHash    String
+  expiresAt  DateTime
+  used       Boolean   @default(false)
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([expiresAt])
 }
 
 model Account {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String   @db.ObjectId
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?  @db.String
-  access_token      String?  @db.String
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?  @db.String
-  session_state     String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String    @db.ObjectId
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?   @db.String
+  access_token       String?   @db.String
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?   @db.String
+  session_state      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  sessionToken String   @unique
-  userId       String   @db.ObjectId
-  expires      DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken  String    @unique
+  userId        String    @db.ObjectId
+  expires       DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  identifier String
-  token      String
-  expires    DateTime
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  identifier  String
+  token       String
+  expires     DateTime
 
   @@unique([identifier, token])
 }
 
 model Authenticator {
-  credentialID         String  @id @map("_id")
-  userId               String  @db.ObjectId
+  credentialID         String   @id @map("_id")
+  userId               String   @db.ObjectId
   providerAccountId    String
   credentialPublicKey  String
   counter              Int
@@ -133,7 +276,7 @@ model Authenticator {
   credentialBackedUp   Boolean
   transports           String?
 
-  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, credentialID])
 }

@@ -3,24 +3,20 @@
 import { z } from "zod";
 import { auth } from "../auth";
 import { prisma } from "../lib/prisma";
-import {
-  generateMultiPlatformContent,
-  type ContentOutput,
-  type Platform,
-  type Tier,
-} from "@/app/lib/ai/generate";
+import { generatePlatformOutputs } from "@/app/lib/ai/generate";
+import type { PlatformOutput, Platform } from "@/app/lib/ai/types";
 import { toCompanyContext } from "@/app/lib/ai/context";
 
 const GenerateDraftsSchema = z.object({
   update: z.string().min(8, "Please enter a more descriptive update."),
   selectedPlatforms: z
-    .array(
-      z.enum(["TWITTER", "LINKEDIN", "INSTAGRAM", "NEWSLETTER"] as const)
-    )
+    .array(z.enum(["TWITTER", "LINKEDIN", "INSTAGRAM", "NEWSLETTER"] as const))
     .min(1, "Select at least one platform."),
 });
 
 export type GenerateDraftsInput = z.infer<typeof GenerateDraftsSchema>;
+export type Tier = "STARTER" | "PREMIUM" | "ENTERPRISE";
+export type ContentOutput = PlatformOutput;
 
 export interface GenerateDraftsResult {
   success: boolean;
@@ -81,8 +77,7 @@ export async function generateDrafts(
       return {
         success: false,
         status: "ERROR",
-        error:
-          "Company context is missing. Please save your brand details first.",
+        error: "Company context is missing. Please save your brand details first.",
       };
     }
 
@@ -90,15 +85,7 @@ export async function generateDrafts(
     const creditsBefore =
       tier === "ENTERPRISE" ? Infinity : (subscription?.creditsRemaining ?? 0);
 
-    const generation = await generateMultiPlatformContent({
-      update,
-      platforms: selectedPlatforms as Platform[],
-      context,
-      tier,
-      creditsRemaining: creditsBefore,
-    });
-
-    if (!generation.success) {
+    if (tier !== "ENTERPRISE" && creditsBefore < selectedPlatforms.length) {
       return {
         success: false,
         status: "BLOCKED",
@@ -107,43 +94,46 @@ export async function generateDrafts(
         creditsUsed: 0,
         creditsAfter: creditsBefore,
         allowedPlatforms: [],
-        error: generation.error,
+        error: "Not enough credits to generate drafts for the selected platforms.",
       };
     }
 
-    const creditsUsed = generation.creditsUsed ?? 0;
-    const allowedPlatforms = Object.keys(
-      generation.results ?? {}
-    ) as Platform[];
+    const outputs = await generatePlatformOutputs({
+      rawUpdate: update,
+      platforms: selectedPlatforms as Platform[],
+      companyContext: context,
+    });
+
+    const results: Partial<Record<Platform, ContentOutput>> = {};
+    for (const output of outputs) {
+      results[output.platform] = output;
+    }
+
+    const creditsUsed = tier === "ENTERPRISE" ? 0 : outputs.length;
+    const allowedPlatforms = outputs.map((o) => o.platform);
 
     let creditsAfter = creditsBefore;
-
     if (tier !== "ENTERPRISE" && Number.isFinite(creditsBefore)) {
       creditsAfter = Math.max(0, creditsBefore - creditsUsed);
 
       await prisma.subscription.update({
         where: { userId: session.user.id },
-        data: {
-          creditsRemaining: creditsAfter,
-        },
+        data: { creditsRemaining: creditsAfter },
       });
     }
 
-    const status =
-      generation.error || allowedPlatforms.length < selectedPlatforms.length
-        ? "PARTIAL_SUCCESS"
-        : "SUCCESS";
-
     return {
       success: true,
-      status,
+      status:
+        allowedPlatforms.length < selectedPlatforms.length
+          ? "PARTIAL_SUCCESS"
+          : "SUCCESS",
       tier,
       creditsBefore,
       creditsUsed,
       creditsAfter,
       allowedPlatforms,
-      results: generation.results,
-      ...(generation.error ? { error: generation.error } : {}),
+      results,
     };
   } catch (error) {
     console.error("[generateDrafts] Error:", error);

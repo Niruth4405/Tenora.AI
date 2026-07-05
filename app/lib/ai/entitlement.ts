@@ -1,4 +1,4 @@
-import type { Platform } from "./prompts";
+import type { Platform } from "./types";
 
 export type Tier = "STARTER" | "PREMIUM" | "ENTERPRISE";
 

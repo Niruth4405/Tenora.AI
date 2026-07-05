@@ -1,139 +1,208 @@
-export type Platform = "TWITTER" | "LINKEDIN" | "INSTAGRAM" | "NEWSLETTER";
+import { Platform } from "./types";
 
 export interface CompanyContext {
-  brandName: string;
-  audience: string;
-  brandVoiceSamples: string[];
+  brandName?: string;
+  audience?: string;
   productsOrServices?: string;
   tone?: string;
+  brandVoiceSamples?: string[];
 }
 
-function buildContextBlock(context: CompanyContext): string {
-  const voiceSamples = context.brandVoiceSamples
-    .filter(Boolean)
-    .slice(0, 3)
-    .join("\n---\n");
+export const TENORA_SYSTEM_PROMPT = `
+You are Tenora AI, an expert content writing assistant for startups, creators, and lean teams.
 
-  return `
-Company Context:
-- Brand Name: ${context.brandName}
-- Target Audience: ${context.audience}
-${context.productsOrServices ? `- Products/Services: ${context.productsOrServices}` : ""}
-${context.tone ? `- Tone: ${context.tone}` : ""}
+Your job is to transform rough company updates into polished platform-specific drafts.
 
-Brand Voice — match this writing style closely:
----
-${voiceSamples || "No voice samples provided."}
----`.trim();
+Core rules:
+- Use only the facts provided in the raw update and product context.
+- Do not invent metrics, customer names, timelines, launches, features, testimonials, or claims.
+- If a detail is unclear, keep the wording general instead of making something up.
+- Preserve the original meaning and intent.
+- Adapt tone using the provided brand voice tags.
+- Write naturally, clearly, and specifically.
+- Avoid generic AI phrasing, startup clichés, and exaggerated marketing language.
+- Return only the final post content.
+- Do not add explanations, labels, quotation marks, or intro text.
+`;
+
+function normalizeText(value?: string) {
+  return value?.trim() || "Not provided.";
 }
 
-function buildSharedRules(platform: Platform): string {
+function brandVoiceLine(tags: string[]) {
+  if (!tags.length) {
+    return "Brand voice tags: clear, concise, modern.";
+  }
+
+  return `Brand voice tags: ${tags.join(", ")}.`;
+}
+
+function companyContextBlock(companyContext?: CompanyContext) {
+  if (!companyContext) return "";
+
   return `
-You will receive a raw company update. It may be messy, incomplete, informal, typo-heavy, or contain multiple ideas.
+Company context:
+Brand name: ${normalizeText(companyContext.brandName)}
+Audience: ${normalizeText(companyContext.audience)}
+Products or services: ${normalizeText(companyContext.productsOrServices)}
+Tone: ${normalizeText(companyContext.tone)}
+`;
+}
 
-Your job:
-- Extract the single most important announcement or angle.
-- Rewrite it clearly for ${platform}.
-- Stay faithful to the source update.
-- Do NOT invent metrics, dates, product details, customer quotes, timelines, or outcomes that are not present in the input.
-- If the input is vague, produce the strongest faithful version possible without hallucinating.
-- If the input contains multiple ideas, prioritize the most important one and keep the output focused.
-- Match the provided brand voice samples closely when available.
-- Keep output ready for a human to lightly edit, not fully rewrite.
+function sharedInputBlock(input: {
+  rawUpdate: string;
+  context: string;
+  brandVoiceTags: string[];
+  companyContext?: CompanyContext;
+}) {
+  return `
+Source material:
+Raw update:
+${normalizeText(input.rawUpdate)}
 
-Hashtag rules:
-- Return hashtags as plain strings without the # symbol.
-- Only include relevant hashtags.
-- Do not stuff hashtags.
+Product / audience context:
+${normalizeText(input.context)}
 
-Response format rules:
-- You MUST respond with ONLY a valid JSON object.
-- No intro text, no explanation, no markdown, no code fences.
-- Start your response with { and end with }.
-- JSON shape must be exactly:
-{"draft": "string", "hashtags": ["string"], "notes": "optional string"}
-`.trim();
+${companyContextBlock(input.companyContext)}
+
+${brandVoiceLine(input.brandVoiceTags)}
+`;
 }
 
 export function buildSystemPrompt(
   platform: Platform,
-  context?: CompanyContext
-): string {
-  const contextBlock = context ? `\n\n${buildContextBlock(context)}` : "";
-  const sharedRules = buildSharedRules(platform);
+  companyContext: CompanyContext | undefined,
+  brandVoiceTags: string[],
+  length: {
+    minWords: number;
+    targetWords: number;
+    maxWords: number;
+  }
+) {
+  const common = sharedInputBlock({
+    rawUpdate: "",
+    context: "",
+    brandVoiceTags,
+    companyContext,
+  });
 
-  const prompts: Record<Platform, string> = {
-    TWITTER: `
-You are a Twitter/X content strategist.
+  switch (platform) {
+    case "LINKEDIN":
+      return `
+${TENORA_SYSTEM_PROMPT}
 
-${sharedRules}
+Write exactly one LinkedIn post.
 
-Platform-specific rules:
-- Write an engaging tweet thread.
-- First tweet must hook the reader.
-- Each tweet must stay under 280 characters.
-- Use max 5 tweets.
-- Separate tweets with a blank line.
-- Tone should be punchy, concise, and conversational.
-- Avoid corporate filler.
-- Notes should contain one brief suggestion for improving engagement, if useful.
+Platform goals:
+- Professional, credible, and human.
+- Clear enough for founders, operators, and startup teams.
+- Insightful without sounding inflated.
 
-${contextBlock}
-`.trim(),
+Formatting rules:
+- Start with a strong opening line.
+- Use short paragraphs for readability.
+- No bullet list unless absolutely necessary.
+- No hashtags unless they are clearly useful.
+- No emojis unless the tone strongly supports it.
 
-    LINKEDIN: `
-You are a LinkedIn content strategist.
+Length rules:
+- Write between ${length.minWords} and ${length.maxWords} words.
+- Aim for about ${length.targetWords} words.
+- Do not stop early.
 
-${sharedRules}
+Content rules:
+- Focus on the most meaningful part of the update.
+- Make the post feel specific to the company update.
+- Do not turn it into broad thought leadership unless the source supports that.
 
-Platform-specific rules:
-- Write a professional LinkedIn post.
-- Start with a strong opening line; avoid clichés like "I’m excited to share".
-- Use short paragraphs, 1–3 lines each.
-- End with a question that can drive comments, if it feels natural.
-- Max 3000 characters.
-- Professional, clear, human tone.
-- Notes should contain one brief suggestion for improving engagement, if useful.
+${common}
+`;
+    case "TWITTER":
+      return `
+${TENORA_SYSTEM_PROMPT}
 
-${contextBlock}
-`.trim(),
+Write exactly one X / Twitter post.
 
-    INSTAGRAM: `
-You are an Instagram content strategist.
+Platform goals:
+- Sharp, concise, and scroll-stopping.
+- Fast to read.
+- Feels native to X, not copied from LinkedIn.
 
-${sharedRules}
+Formatting rules:
+- Use line breaks only if they improve punch and readability.
+- Prefer one central idea.
+- No hashtag stuffing.
+- No emoji spam.
 
-Platform-specific rules:
-- Write an engaging Instagram caption.
-- Start with an attention-grabbing first line.
-- Max 2200 characters.
-- Use emojis sparingly and only when they help.
-- End with a clear call to action.
-- Keep the tone warm, relatable, and natural.
-- Notes should contain one brief suggestion for visual pairing or CTA improvement, if useful.
+Length rules:
+- Write between ${length.minWords} and ${length.maxWords} words.
+- Aim for about ${length.targetWords} words.
+- Stay concise, but still satisfy the requested length.
+- If needed, use the full 280-character style efficiently.
 
-${contextBlock}
-`.trim(),
+Content rules:
+- Lead with the strongest angle.
+- Make it sound direct and current.
+- Avoid filler words and weak openers.
 
-    NEWSLETTER: `
-You are a newsletter editor.
+${common}
+`;
+    case "INSTAGRAM":
+      return `
+${TENORA_SYSTEM_PROMPT}
 
-${sharedRules}
+Write exactly one Instagram caption.
 
-Platform-specific rules:
-- Write a short newsletter section.
-- Never start with "Hello", "Hi", or any greeting.
-- Open with the most interesting line immediately.
-- Max 150 words.
-- One paragraph only.
-- End with one clear, direct call to action.
-- Do not use hashtags.
-- Keep it minimal, sharp, and direct.
-- Put any suggested subject line inside notes, for example: "Subject line: ..."
+Platform goals:
+- Slightly warmer, more expressive, and more human.
+- Still clear and grounded in the original update.
 
-${contextBlock}
-`.trim(),
-  };
+Formatting rules:
+- Start with a strong first line.
+- Can be 2 to 5 short paragraphs.
+- Emojis are allowed only if they fit the tone naturally.
+- Use at most 3 hashtags, and only if helpful.
 
-  return prompts[platform];
+Length rules:
+- Write between ${length.minWords} and ${length.maxWords} words.
+- Aim for about ${length.targetWords} words.
+- Do not underwrite.
+
+Content rules:
+- Keep the language easy to read.
+- Make the caption feel polished but not overproduced.
+- Do not sound like ad copy.
+
+${common}
+`;
+    case "NEWSLETTER":
+      return `
+${TENORA_SYSTEM_PROMPT}
+
+Write exactly one short newsletter update.
+
+Platform goals:
+- Clear, informative, and slightly more explanatory than social posts.
+- Useful for existing users, customers, or subscribers.
+
+Formatting rules:
+- Use 2 to 4 short paragraphs.
+- No clickbait subject line.
+- No hype-heavy language.
+
+Length rules:
+- Write between ${length.minWords} and ${length.maxWords} words.
+- Aim for about ${length.targetWords} words.
+- Ensure the update is complete and not abruptly cut short.
+
+Content rules:
+- Explain the update clearly.
+- Preserve accuracy over style.
+- Make it feel like a real product or company update.
+
+${common}
+`;
+    default:
+      return TENORA_SYSTEM_PROMPT;
+  }
 }

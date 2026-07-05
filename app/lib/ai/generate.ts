@@ -1,208 +1,128 @@
 import { groq } from "@ai-sdk/groq";
 import { generateText } from "ai";
-import { buildSystemPrompt, CompanyContext, Platform } from "./prompts";
-import { checkEntitlement, Tier } from "./entitlement";
+import { buildSystemPrompt } from "./prompts";
+import type {
+  ContentSize,
+  PlatformOutput,
+  Platform,
+  CompanyContext,
+} from "./types";
 
-export type { Platform, CompanyContext, Tier };
+const sizeToRange: Record<
+  ContentSize,
+  { min: number; target: number; max: number }
+> = {
+  small: { min: 30, target: 40, max: 55 },
+  medium: { min: 60, target: 75, max: 95 },
+  large: { min: 120, target: 150, max: 180 },
+  custom: { min: 1, target: 1, max: 1 },
+};
 
-export interface ContentOutput {
-  draft: string;
-  hashtags: string[];
-  notes?: string;
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export interface GenerateContentInput {
+function getWordRange(size: ContentSize, customWordCount?: number) {
+  if (size !== "custom") return sizeToRange[size];
+
+  const target = Math.max(20, customWordCount ?? 100);
+  return {
+    min: Math.max(15, Math.round(target * 0.9)),
+    target,
+    max: Math.round(target * 1.2),
+  };
+}
+
+async function generateSinglePlatform(params: {
   update: string;
+  context?: string;
   platform: Platform;
-  context?: CompanyContext;
-}
+  companyContext?: CompanyContext;
+  brandVoiceTags?: string[];
+  size?: ContentSize;
+  customWordCount?: number;
+}): Promise<PlatformOutput> {
+  const range = getWordRange(params.size ?? "medium", params.customWordCount);
 
-export interface MultiGenerateInput {
-  update: string;
-  platforms: Platform[];
-  context?: CompanyContext;
-  tier: Tier;
-  creditsRemaining: number;
-}
-
-export interface MultiGenerateOutput {
-  success: boolean;
-  results?: Partial<Record<Platform, ContentOutput>>;
-  error?: string;
-  creditsUsed?: number;
-}
-
-function validateUpdate(update: string): string | null {
-  const normalized = update.trim();
-
-  if (!normalized) {
-    return "Please enter an update before generating content.";
-  }
-
-  if (normalized.length < 8) {
-    return "Your update is too short. Please add a bit more context.";
-  }
-
-  return null;
-}
-
-function normalizeHashtags(hashtags: unknown): string[] {
-  if (!Array.isArray(hashtags)) return [];
-
-  return hashtags
-    .filter((tag): tag is string => typeof tag === "string")
-    .map((tag) => tag.trim().replace(/^#+/, ""))
-    .filter(Boolean)
-    .slice(0, 8);
-}
-
-function safeParseJSON(raw: string): ContentOutput {
-  const cleaned = raw
-    .replace(/```json\s*/gi, "")
-    .replace(/```\s*/gi, "")
-    .trim();
-
-  try {
-    const parsed = JSON.parse(cleaned);
-
-    return {
-      draft:
-        typeof parsed?.draft === "string" && parsed.draft.trim()
-          ? parsed.draft.trim()
-          : cleaned,
-      hashtags: normalizeHashtags(parsed?.hashtags),
-      notes:
-        typeof parsed?.notes === "string" && parsed.notes.trim()
-          ? parsed.notes.trim()
-          : undefined,
-    };
-  } catch {
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      return {
-        draft: cleaned,
-        hashtags: [],
-        notes: undefined,
-      };
+  const system = buildSystemPrompt(
+    params.platform,
+    params.companyContext,
+    params.brandVoiceTags ?? [],
+    {
+      minWords: range.min,
+      targetWords: range.target,
+      maxWords: range.max,
     }
+  );
 
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      return {
-        draft:
-          typeof parsed?.draft === "string" && parsed.draft.trim()
-            ? parsed.draft.trim()
-            : cleaned,
-        hashtags: normalizeHashtags(parsed?.hashtags),
-        notes:
-          typeof parsed?.notes === "string" && parsed.notes.trim()
-            ? parsed.notes.trim()
-            : undefined,
-      };
-    } catch {
-      return {
-        draft: cleaned,
-        hashtags: [],
-        notes: undefined,
-      };
-    }
-  }
-}
-
-export async function generateContent(
-  input: GenerateContentInput
-): Promise<ContentOutput> {
-  const { update, platform, context } = input;
-
-  const validationError = validateUpdate(update);
-  if (validationError) {
-    throw new Error(validationError);
-  }
-
-  const systemPrompt = buildSystemPrompt(platform, context);
-
-  const { text } = await generateText({
-    model: groq("llama-3.3-70b-versatile"),
-    system: systemPrompt,
-    prompt: `Generate ${platform} content for the following company update:\n\n${update.trim()}`,
+  const result = await generateText({
+    model: groq("llama-3.1-8b-instant"),
+    system,
+    prompt: [
+      `Source update: ${params.update}`,
+      params.context
+        ? `Product / audience context: ${params.context}`
+        : "",
+      `Write for ${params.platform}.`,
+      `Target length: ${range.min}-${range.max} words. Aim for about ${range.target} words.`,
+      `Return only the final content.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+    maxOutputTokens: Math.max(256, range.max * 4),
   });
 
-  return safeParseJSON(text);
+  let content = result.text.trim();
+  let wordCount = countWords(content);
+
+  if (wordCount < range.min) {
+    try {
+      const expanded = await generateText({
+        model: groq("llama-3.1-8b-instant"),
+        system,
+        prompt: [
+          `Expand the draft below to ${range.min}-${range.max} words without changing the meaning.`,
+          `Keep the same platform voice and make it natural.`,
+          `Draft:\n${content}`,
+        ].join("\n\n"),
+        maxOutputTokens: Math.max(256, range.max * 4),
+      });
+
+      content = expanded.text.trim();
+      wordCount = countWords(content);
+    } catch (error) {
+      console.error(`Expansion failed for ${params.platform}:`, error);
+    }
+  }
+
+  return {
+    platform: params.platform,
+    draft:content,
+    wordCount,
+    hashtags: [],
+  };
 }
 
-export async function generateMultiPlatformContent(
-  input: MultiGenerateInput
-): Promise<MultiGenerateOutput> {
-  const { update, platforms, context, tier, creditsRemaining } = input;
-
-  const validationError = validateUpdate(update);
-  if (validationError) {
-    return {
-      success: false,
-      error: validationError,
-    };
-  }
-
-  const entitlement = checkEntitlement(tier, platforms, creditsRemaining);
-
-  if (!entitlement.allowed) {
-    return {
-      success: false,
-      error: entitlement.reason,
-    };
-  }
-
-  try {
-    const settled = await Promise.allSettled(
-      entitlement.allowedPlatforms.map(async (platform) => {
-        const content = await generateContent({ update, platform, context });
-        return { platform, content };
+export async function generatePlatformOutputs(params: {
+  rawUpdate: string;
+  context?: string;
+  brandVoiceTags?: string[];
+  platforms: Platform[];
+  size?: ContentSize;
+  customWordCount?: number;
+  companyContext?: CompanyContext;
+}): Promise<PlatformOutput[]> {
+  return Promise.all(
+    params.platforms.map((platform) =>
+      generateSinglePlatform({
+        update: params.rawUpdate,
+        context: params.context,
+        platform,
+        companyContext: params.companyContext,
+        brandVoiceTags: params.brandVoiceTags,
+        size: params.size,
+        customWordCount: params.customWordCount,
       })
-    );
-
-    const results: Partial<Record<Platform, ContentOutput>> = {};
-    const errors: string[] = [];
-
-    for (const outcome of settled) {
-      if (outcome.status === "fulfilled") {
-        results[outcome.value.platform] = outcome.value.content;
-      } else {
-        errors.push(outcome.reason?.message ?? "Unknown error");
-      }
-    }
-
-    const successCount = Object.keys(results).length;
-
-    if (successCount === 0) {
-      return {
-        success: false,
-        error: errors[0] ?? "Generation failed. Please try again.",
-      };
-    }
-
-    const warningMessages = [
-      entitlement.reason,
-      errors.length > 0
-        ? `Some platforms failed: ${errors.join("; ")}`
-        : undefined,
-    ].filter(Boolean);
-
-    return {
-      success: true,
-      results,
-      creditsUsed: tier === "ENTERPRISE" ? 0 : successCount,
-      ...(warningMessages.length > 0
-        ? { error: warningMessages.join(" ") }
-        : {}),
-    };
-  } catch (err) {
-    console.error("[generateMultiPlatformContent] Fatal error:", err);
-
-    return {
-      success: false,
-      error: "Generation failed. Please try again.",
-    };
-  }
+    )
+  );
 }
