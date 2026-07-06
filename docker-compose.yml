@@ -1,0 +1,35 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tenora-app
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - mongo
+    networks:
+      - tenora-net
+
+  mongo:
+    image: mongo:7
+    container_name: tenora-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: tenora
+    networks:
+      - tenora-net
+
+volumes:
+  mongo-data:
+
+networks:
+  tenora-net:
+    driver: bridge
