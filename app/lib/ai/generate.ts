@@ -49,10 +49,8 @@ async function generateSinglePlatform(params: {
     params.companyContext,
     params.brandVoiceTags ?? [],
     {
-      minWords: range.min,
       targetWords: range.target,
-      maxWords: range.max,
-    }
+    },
   );
 
   const result = await generateText({
@@ -60,11 +58,9 @@ async function generateSinglePlatform(params: {
     system,
     prompt: [
       `Source update: ${params.update}`,
-      params.context
-        ? `Product / audience context: ${params.context}`
-        : "",
+      params.context ? `Product / audience context: ${params.context}` : "",
       `Write for ${params.platform}.`,
-      `Target length: ${range.min}-${range.max} words. Aim for about ${range.target} words.`,
+      `Target length: ${range.target} words. Do not go below or above the word limit by more than 5%.`,
       `Return only the final content.`,
     ]
       .filter(Boolean)
@@ -97,7 +93,7 @@ async function generateSinglePlatform(params: {
 
   return {
     platform: params.platform,
-    draft:content,
+    draft: content,
     wordCount,
     hashtags: [],
   };
@@ -122,7 +118,7 @@ export async function generatePlatformOutputs(params: {
         brandVoiceTags: params.brandVoiceTags,
         size: params.size,
         customWordCount: params.customWordCount,
-      })
-    )
+      }),
+    ),
   );
 }

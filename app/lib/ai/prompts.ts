@@ -1,7 +1,7 @@
 import { Platform } from "./types";
 
 export interface CompanyContext {
-  brandName?: string;
+  // brandName?: string;
   audience?: string;
   productsOrServices?: string;
   tone?: string;
@@ -23,6 +23,8 @@ Core rules:
 - Avoid generic AI phrasing, startup clichés, and exaggerated marketing language.
 - Return only the final post content.
 - Do not add explanations, labels, quotation marks, or intro text.
+- Stick to the requested word count range and target word count.
+
 `;
 
 function normalizeText(value?: string) {
@@ -42,7 +44,6 @@ function companyContextBlock(companyContext?: CompanyContext) {
 
   return `
 Company context:
-Brand name: ${normalizeText(companyContext.brandName)}
 Audience: ${normalizeText(companyContext.audience)}
 Products or services: ${normalizeText(companyContext.productsOrServices)}
 Tone: ${normalizeText(companyContext.tone)}
@@ -74,10 +75,8 @@ export function buildSystemPrompt(
   companyContext: CompanyContext | undefined,
   brandVoiceTags: string[],
   length: {
-    minWords: number;
     targetWords: number;
-    maxWords: number;
-  }
+  },
 ) {
   const common = sharedInputBlock({
     rawUpdate: "",
@@ -106,9 +105,9 @@ Formatting rules:
 - No emojis unless the tone strongly supports it.
 
 Length rules:
-- Write between ${length.minWords} and ${length.maxWords} words.
-- Aim for about ${length.targetWords} words.
+- Write exaclty ${length.targetWords} words.
 - Do not stop early.
+- Aim for humanization of text making it feel like a real person wrote it.
 
 Content rules:
 - Focus on the most meaningful part of the update.
@@ -135,10 +134,9 @@ Formatting rules:
 - No emoji spam.
 
 Length rules:
-- Write between ${length.minWords} and ${length.maxWords} words.
-- Aim for about ${length.targetWords} words.
-- Stay concise, but still satisfy the requested length.
-- If needed, use the full 280-character style efficiently.
+- Write exactly ${length.targetWords} words.
+- Do not stop early.
+- Aim for humanization of text making it feel like a real person wrote it.
 
 Content rules:
 - Lead with the strongest angle.
@@ -164,9 +162,9 @@ Formatting rules:
 - Use at most 3 hashtags, and only if helpful.
 
 Length rules:
-- Write between ${length.minWords} and ${length.maxWords} words.
-- Aim for about ${length.targetWords} words.
-- Do not underwrite.
+- Write exactly ${length.targetWords} words.
+- Do not stop early.
+- Aim for humanization of text making it feel like a real person wrote it.
 
 Content rules:
 - Keep the language easy to read.
@@ -191,9 +189,9 @@ Formatting rules:
 - No hype-heavy language.
 
 Length rules:
-- Write between ${length.minWords} and ${length.maxWords} words.
-- Aim for about ${length.targetWords} words.
-- Ensure the update is complete and not abruptly cut short.
+- Write exactly ${length.targetWords} words.
+- Do not stop early.
+- Aim for humanization of text making it feel like a real person wrote it.
 
 Content rules:
 - Explain the update clearly.

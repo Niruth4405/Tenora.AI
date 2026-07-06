@@ -25,7 +25,6 @@ export function toCompanyContext(
   if (!brandName || !audience) return undefined;
 
   return {
-    brandName,
     audience,
     brandVoiceSamples,
     productsOrServices: stored.productsOrServices?.trim() || undefined,
