@@ -11,8 +11,12 @@ COPY prisma.config.ts ./
 RUN npm ci
 
 # ── Stage 2: builder ────────────────────────────────────────────────
+
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
