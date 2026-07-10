@@ -6,7 +6,7 @@ import { prisma } from "../lib/prisma";
 import { generatePlatformOutputs } from "@/app/lib/ai/generate";
 import type { PlatformOutput, Platform } from "@/app/lib/ai/types";
 import { toCompanyContext } from "@/app/lib/ai/context";
-import { SocialPlatform, DraftStatus } from "@prisma/client";  // ← ADD THIS
+import { SocialPlatform, DraftStatus } from "@prisma/client"; // ← ADD THIS
 
 const GenerateDraftsSchema = z.object({
   update: z.string().min(8, "Please enter a more descriptive update."),
@@ -27,7 +27,7 @@ export interface GenerateDraftsResult {
 }
 
 export async function generateDrafts(
-  input: GenerateDraftsInput
+  input: GenerateDraftsInput,
 ): Promise<GenerateDraftsResult> {
   try {
     const session = await auth();
@@ -35,6 +35,7 @@ export async function generateDrafts(
     if (!session?.user?.id) {
       return { success: false, status: "ERROR", error: "Unauthorized." };
     }
+    const userId = session.user.id as string;
 
     const parsed = GenerateDraftsSchema.safeParse(input);
 
@@ -72,7 +73,7 @@ export async function generateDrafts(
     if (outputs.length > 0) {
       await prisma.generatedPost.createMany({
         data: outputs.map((output) => ({
-          userId: session.user.id,
+          userId,
           platform: output.platform as SocialPlatform,
           sourceUpdate: update,
           content: Array.isArray(output.draft)
