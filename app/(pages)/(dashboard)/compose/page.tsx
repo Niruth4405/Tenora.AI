@@ -160,6 +160,7 @@ export default function ComposePage() {
       const response = await generateDrafts({
         update: composed,
         selectedPlatforms,
+        wordCount,
       });
 
       setResult(response);

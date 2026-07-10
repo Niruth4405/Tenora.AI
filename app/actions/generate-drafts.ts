@@ -13,6 +13,7 @@ const GenerateDraftsSchema = z.object({
   selectedPlatforms: z
     .array(z.enum(["TWITTER", "LINKEDIN", "INSTAGRAM", "NEWSLETTER"] as const))
     .min(1, "Select at least one platform."),
+  wordCount: z.number(), // align with MIN_WORDS / MAX_WORDS in ComposePage
 });
 
 export type GenerateDraftsInput = z.infer<typeof GenerateDraftsSchema>;
@@ -47,7 +48,7 @@ export async function generateDrafts(
       };
     }
 
-    const { update, selectedPlatforms } = parsed.data;
+    const { update, selectedPlatforms, wordCount } = parsed.data;
 
     const companyContextRecord = await prisma.companyContext.findUnique({
       where: { userId: session.user.id },
@@ -56,10 +57,11 @@ export async function generateDrafts(
     const context = toCompanyContext(companyContextRecord);
 
     const outputs = await generatePlatformOutputs({
-      rawUpdate: update,
-      platforms: selectedPlatforms as Platform[],
-      companyContext: context ?? undefined,
-    });
+  update,                               // ✅ property name must match the function’s param type
+  platforms: selectedPlatforms as Platform[],
+  wordCount,
+  companyContext: context ?? undefined,
+});
 
     const results: Partial<Record<Platform, ContentOutput>> = {};
     for (const output of outputs) {

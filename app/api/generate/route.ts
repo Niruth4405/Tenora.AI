@@ -146,17 +146,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const outputs =
-      await generatePlatformOutputs({
-        rawUpdate: body.rawUpdate,
-
-        context: body.context ?? "",
-
-        brandVoiceTags:
-          body.brandVoiceTags ?? [],
-
-        platforms,
-      });
+   const outputs = await generatePlatformOutputs({
+  update: body.rawUpdate,
+  platforms,
+  wordCount: body.customWordCount ?? 150,
+  // optionally:
+  companyContext: undefined, // or build from body.context/body.brandVoiceTags
+});
 
     const result =
       await prisma.$transaction(
