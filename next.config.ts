@@ -15,16 +15,7 @@ const nextConfig: NextConfig = {
 
   async redirects() {
     return [
-      {
-        source: "/create",
-        destination: "/compose",
-        permanent: false,
-      },
-      {
-        source: "/drafts",
-        destination: "/dashboard",
-        permanent: false,
-      },
+    
     ];
   },
 };

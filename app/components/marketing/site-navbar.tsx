@@ -32,10 +32,10 @@ export default async function SiteNavbar() {
               Home
             </Link>
             <Link
-              href="/dashboard"
+              href="/history"
               className="rounded-full px-4 py-2 text-sm text-white/70 transition hover:bg-white/5 hover:text-white"
             >
-              Dashboard
+              History
             </Link>
             <Link
               href="/compose"

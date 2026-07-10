@@ -25,7 +25,7 @@ type Post = {
   platform: string;
   sourceUpdate: string;
   content: string;
-  hashtags: string[];
+ 
   status: string;
   createdAt: string;
 };
@@ -173,18 +173,7 @@ export default function HistoryClient({
                       {post.content}
                     </p>
                   </div>
-                  {post.hashtags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {post.hashtags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs text-emerald-400"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  
                   <div className="border-t border-white/[0.06] pt-3">
                     <p className="text-xs text-white/30">Source update</p>
                     <p className="mt-1 text-sm text-white/50 whitespace-pre-wrap">
