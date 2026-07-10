@@ -27,6 +27,26 @@ Core rules:
 
 `;
 
+function audienceStyleLine(audience?: string) {
+  if (!audience) return "";
+
+  const a = audience.toLowerCase().trim();
+
+  if (a === "founders") {
+    return "Write for startup founders: use concise, outcome-focused language, assume some domain knowledge, and focus on impact.";
+  }
+
+  if (a === "students") {
+    return "Write for students: use simple language, explain necessary background, avoid heavy jargon, and keep examples relatable.";
+  }
+
+  if (a === "marketers") {
+    return "Write for marketers: highlight positioning, messaging, and user benefits, while staying clear and non-hypey.";
+  }
+
+  return `Write for ${audience}: adapt vocabulary, examples, and level of explanation to suit this audience.`;
+}
+
 function normalizeText(value?: string) {
   return value?.trim() || "Not provided.";
 }
@@ -54,6 +74,7 @@ function sharedInputBlock(input: {
   rawUpdate: string;
   context: string;
   brandVoiceTags: string[];
+  
   companyContext?: CompanyContext;
 }) {
   return `
@@ -67,6 +88,8 @@ ${normalizeText(input.context)}
 ${companyContextBlock(input.companyContext)}
 
 ${brandVoiceLine(input.brandVoiceTags)}
+
+${audienceStyleLine(input.companyContext?.audience)}
 `;
 }
 

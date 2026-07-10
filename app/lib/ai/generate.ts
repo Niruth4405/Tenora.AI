@@ -52,6 +52,7 @@ async function generateSinglePlatform(params: {
       targetWords: range.target,
     },
   );
+  const approxTokens = Math.round(range.max * 1.3);
 
   const result = await generateText({
     model: groq("llama-3.1-8b-instant"),
@@ -62,10 +63,11 @@ async function generateSinglePlatform(params: {
       `Write for ${params.platform}.`,
       `Target length: ${range.target} words. Do not go below or above the word limit by more than 5%.`,
       `Return only the final content.`,
+      `Stop writing as soon as you reach about ${range.target} words. Do not add extra sentences.`,
     ]
       .filter(Boolean)
       .join("\n\n"),
-    maxOutputTokens: Math.max(256, range.max * 4),
+    maxOutputTokens: Math.max(128, approxTokens),
   });
 
   let content = result.text.trim();
@@ -81,7 +83,7 @@ async function generateSinglePlatform(params: {
           `Keep the same platform voice and make it natural.`,
           `Draft:\n${content}`,
         ].join("\n\n"),
-        maxOutputTokens: Math.max(256, range.max * 4),
+        maxOutputTokens: Math.max(128, approxTokens),
       });
 
       content = expanded.text.trim();
