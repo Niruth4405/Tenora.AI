@@ -6,6 +6,7 @@ import { prisma } from "../lib/prisma";
 import { generatePlatformOutputs } from "@/app/lib/ai/generate";
 import type { PlatformOutput, Platform } from "@/app/lib/ai/types";
 import { toCompanyContext } from "@/app/lib/ai/context";
+import { SocialPlatform, DraftStatus } from "@prisma/client";  // ← ADD THIS
 
 const GenerateDraftsSchema = z.object({
   update: z.string().min(8, "Please enter a more descriptive update."),
@@ -65,6 +66,25 @@ export async function generateDrafts(
     }
 
     const allowedPlatforms = outputs.map((o) => o.platform);
+
+    // ── AUTO-SAVE TO GeneratedPost ─────────────────────────────────────────
+    // Every generation is persisted immediately so /history always has a log.
+    if (outputs.length > 0) {
+      await prisma.generatedPost.createMany({
+        data: outputs.map((output) => ({
+          userId: session.user.id,
+          platform: output.platform as SocialPlatform,
+          sourceUpdate: update,
+          content: Array.isArray(output.draft)
+            ? output.draft.join("\n")
+            : (output.draft ?? ""),
+          hashtags: output.hashtags ?? [],
+          voiceTags: [],
+          status: DraftStatus.DRAFT,
+        })),
+      });
+    }
+    // ──────────────────────────────────────────────────────────────────────
 
     return {
       success: true,
