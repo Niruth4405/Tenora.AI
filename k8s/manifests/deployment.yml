@@ -55,7 +55,7 @@ spec:
           failureThreshold: 3
 
         # "Are you still alive?" check
-        livenessProbe:
+        livenessProbe: # Auto recovery
           httpGet:
             path: /api/health
             port: 3000
