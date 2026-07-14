@@ -2,16 +2,24 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tenora-app
+  namespace: tenora
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - tenora.ai
+      secretName: tenora-tls
   rules:
     - host: tenora.ai
-  http:
-    paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: tenora-app
-            port:
-              number: 3000
+      http:               
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tenora-app
+                port:
+                  number: 3000

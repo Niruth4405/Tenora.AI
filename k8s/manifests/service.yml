@@ -2,10 +2,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: tenora-app
+  namespace: tenora
 spec:
+  type: ClusterIP
   selector:
-    app.kubernetes.io/name: tenora-app
+    app: tenora-app     
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 3000
       targetPort: 3000

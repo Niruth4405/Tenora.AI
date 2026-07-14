@@ -2,13 +2,23 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tenora-app
+  namespace: tenora
   labels:
     app: tenora-app
 spec:
   replicas: 3
+
   selector:
     matchLabels:
       app: tenora-app
+
+  # Zero-downtime rolling updates
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+
   template:
     metadata:
       labels:
@@ -16,6 +26,39 @@ spec:
     spec:
       containers:
       - name: tenora-app
-        image: niruth03/tenora:latest
+        image: niruth03/tenora:v1.0.0    # pinned tag, NOT :latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
+
+        # Inject ALL keys from the Secret as env vars
+        envFrom:
+        - secretRef:
+            name: tenora-secrets
+
+        # CPU/memory guardrails
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+        # "Are you ready for traffic?" check
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
+
+        # "Are you still alive?" check
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
