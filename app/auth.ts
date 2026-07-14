@@ -6,12 +6,39 @@ import { prisma } from "../app/lib/prisma";
 import bcrypt from "bcryptjs";
 import type { Adapter } from "next-auth/adapters";
 
+// ── Module augmentation for NextAuth v5 Beta ──────────────────────────────────
+declare module "next-auth" {
+  interface User {
+    id?: string;
+    username?: string;
+  }
+  interface Session {
+    user: {
+      id: string;
+      username?: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+    };
+  }
+}
+
+declare module "@auth/core/jwt" {
+  // ✅ NextAuth v5 Beta uses @auth/core/jwt — NOT next-auth/jwt
+  interface JWT {
+    id?: string;
+    username?: string;
+  }
+}
+
 function generateUsername(email: string) {
   return email.split("@")[0] + "_" + Math.floor(1000 + Math.random() * 9000);
 }
 
-const config = {
-  debug: process.env.NODE_ENV === "development", // ← don't log in production
+const config: NextAuthConfig = {
+  // ✅ Use NextAuthConfig as explicit type — NOT `satisfies`
+  //    `satisfies` triggers stricter callback variance checks in v5 Beta
+  debug: process.env.NODE_ENV === "development",
   trustHost: true,
 
   adapter: PrismaAdapter(prisma) as Adapter,
@@ -32,17 +59,13 @@ const config = {
         email: {},
         password: {},
       },
-
       async authorize(credentials) {
         const email = credentials?.email as string;
         const password = credentials?.password as string;
 
         if (!email || !password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
-
+        const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.passwordHash) return null;
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
@@ -53,7 +76,7 @@ const config = {
           name: user.name,
           email: user.email,
           image: user.image,
-          username: user.username,
+          username: user.username ?? undefined,
         };
       },
     }),
@@ -64,6 +87,7 @@ const config = {
   },
 
   callbacks: {
+    // ✅ NO explicit param type annotations — let NextAuth v5 Beta infer
     async signIn({ user, account }) {
       if (!user.email) return true;
 
@@ -101,7 +125,7 @@ const config = {
           });
         }
 
-        (user as any).id = existingUser.id;
+        user.id = existingUser.id;
       } else {
         const newUser = await prisma.user.create({
           data: {
@@ -112,20 +136,18 @@ const config = {
           },
         });
 
-        (user as any).id = newUser.id;
+        user.id = newUser.id;
       }
 
       return true;
     },
 
-    // Store username in JWT so session callback never needs a DB call
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        token.id = (user as any).id;
-        token.username = (user as any).username;
+        token.id = user.id;
+        token.username = (user as { username?: string }).username;
       }
 
-      // Handle session.update() calls if needed later
       if (trigger === "update" && session?.username) {
         token.username = session.username;
       }
@@ -133,30 +155,23 @@ const config = {
       return token;
     },
 
-    // Read from token — NO database query here
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).username = token.username;
+        session.user.id = token.id as string;
+        session.user.username = token.username as string | undefined;
       }
       return session;
     },
 
-    // ✅ Fixed redirect — don't intercept callbackUrl blindly
     async redirect({ url, baseUrl }) {
-      // Allow relative paths
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-
-      // Allow same-origin absolute URLs
       if (new URL(url).origin === baseUrl) return url;
-
-      // Default fallback
       return baseUrl;
     },
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-} satisfies NextAuthConfig;
+};
 
 export const {
   handlers: { GET, POST },
