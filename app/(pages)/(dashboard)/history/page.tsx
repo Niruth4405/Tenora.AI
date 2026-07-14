@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { redirect } from "next/navigation";
 import AppShell from "../../../components/layout/app-shell";
 import HistoryClient from "../../../components/history-client";
+import { SocialPlatform } from "@prisma/client";   // ✅ new import
 
 export default async function HistoryPage({
   searchParams,
@@ -18,9 +19,16 @@ export default async function HistoryPage({
   const limit = 20;
   const skip = (page - 1) * limit;
 
+  // ✅ Validate query param is a real SocialPlatform before passing to Prisma
+  const validPlatforms = Object.values(SocialPlatform) as string[];
+  const platformFilter: SocialPlatform | undefined =
+    platform && validPlatforms.includes(platform)
+      ? (platform as SocialPlatform)
+      : undefined;
+
   const where = {
     userId: session.user.id,
-    ...(platform ? { platform: platform as any } : {}),
+    ...(platformFilter ? { platform: platformFilter } : {}),
   };
 
   const [posts, total] = await Promise.all([

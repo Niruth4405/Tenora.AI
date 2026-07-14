@@ -7,6 +7,7 @@ import type { Platform } from "@/app/lib/ai/types";
 import { IoCopyOutline, IoCheckmarkOutline } from "react-icons/io5";
 import { MdOutlineEdit, MdOutlineEditOff } from "react-icons/md";
 
+// ── Platform constants ────────────────────────────────────────────────────────
 const PLATFORM_OPTIONS: {
   value: Platform;
   label: string;
@@ -31,8 +32,42 @@ const TONE_OPTIONS = [
 const MIN_WORDS = 50;
 const MAX_WORDS = 800;
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+type SocialPlatform = "LINKEDIN" | "TWITTER" | "INSTAGRAM" | "NEWSLETTER";
+
+const VALID_PLATFORMS: SocialPlatform[] = [
+  "LINKEDIN",
+  "TWITTER",
+  "INSTAGRAM",
+  "NEWSLETTER",
+];
+
+function isValidPlatform(p: string): p is SocialPlatform {
+  return VALID_PLATFORMS.includes(p as SocialPlatform);
+}
+
+interface DraftOutput {
+  draft: string | string[];
+  hashtags?: string[];
+  notes?: string;
+}
+
+interface GenerateResult {
+  success: boolean;
+  error?: string;
+  // ✅ Keys typed as the literal union — Object.entries() will narrow correctly
+  results?: Partial<Record<SocialPlatform, DraftOutput>>;
+  savedCount?: number;
+}
+
 // ── Draft card ────────────────────────────────────────────────────────────────
-function DraftCard({ platform, output }: { platform: string; output: any }) {
+function DraftCard({
+  platform,
+  output,
+}: {
+  platform: string;
+  output: DraftOutput;
+}) {
   const rawDraft = Array.isArray(output.draft)
     ? output.draft.join("\n")
     : (output.draft ?? "");
@@ -50,13 +85,12 @@ function DraftCard({ platform, output }: { platform: string; output: any }) {
 
   return (
     <div className="rounded-2xl bg-[#11161c] border border-white/[0.06] p-5 space-y-3">
-      {/* Header row */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-semibold text-white/60">
           {platform}
         </span>
         <div className="flex items-center gap-2">
-          {/* Edit toggle */}
           <button
             type="button"
             onClick={() => setEditing((prev) => !prev)}
@@ -69,7 +103,6 @@ function DraftCard({ platform, output }: { platform: string; output: any }) {
               <><MdOutlineEdit size={14} /> Edit</>
             )}
           </button>
-          {/* Copy */}
           <button
             type="button"
             onClick={handleCopy}
@@ -104,7 +137,7 @@ function DraftCard({ platform, output }: { platform: string; output: any }) {
       )}
 
       {/* Hashtags */}
-      {output.hashtags?.length > 0 && (
+      {output.hashtags && output.hashtags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {output.hashtags.map((tag: string) => (
             <span
@@ -128,7 +161,7 @@ export default function ComposePage() {
   const [audience, setAudience] = useState("");
   const [wordCount, setWordCount] = useState(150);
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(["LINKEDIN"]);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<GenerateResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isGenerating, startGenerating] = useTransition();
@@ -176,15 +209,20 @@ export default function ComposePage() {
     if (!result?.results) return;
     setSaveMessage(null);
 
+    // ✅ Object.entries on Partial<Record<SocialPlatform, DraftOutput>> gives
+    //    [string, DraftOutput | undefined][] — filter + guard narrows platform safely
     const drafts = Object.entries(result.results)
-      .filter(([, output]) => Boolean(output))
-      .map(([platform, output]: any) => ({
-        platform,
-        draft: Array.isArray(output?.draft)
+      .filter(
+        (entry): entry is [SocialPlatform, DraftOutput] =>
+          isValidPlatform(entry[0]) && Boolean(entry[1])
+      )
+      .map(([platform, output]) => ({
+        platform,                                         // ✅ SocialPlatform literal, no cast needed
+        draft: Array.isArray(output.draft)
           ? output.draft.join("\n")
-          : (output?.draft ?? ""),
-        hashtags: output?.hashtags ?? [],
-        notes: output?.notes,
+          : (output.draft ?? ""),
+        hashtags: output.hashtags ?? [],
+        notes: output.notes,
         size: "MEDIUM" as const,
       }));
 
@@ -386,7 +424,9 @@ export default function ComposePage() {
 
           {message && (
             <p className={`rounded-xl px-4 py-3 text-sm ${
-              result?.success ? "bg-emerald-400/10 text-emerald-400" : "bg-red-400/10 text-red-400"
+              result?.success
+                ? "bg-emerald-400/10 text-emerald-400"
+                : "bg-red-400/10 text-red-400"
             }`}>
               {message}
             </p>
@@ -398,9 +438,11 @@ export default function ComposePage() {
           <div className="mt-8 space-y-4">
             <h2 className="text-sm font-medium text-white">Generated Drafts</h2>
 
-            {Object.entries(result.results).map(([platform, output]: any) => (
-              <DraftCard key={platform} platform={platform} output={output} />
-            ))}
+            {(Object.entries(result.results) as [SocialPlatform, DraftOutput][]).map(
+              ([platform, output]) => (
+                <DraftCard key={platform} platform={platform} output={output} />
+              )
+            )}
 
             <button
               type="button"
