@@ -43,3 +43,6 @@ next-env.d.ts
 /app/generated/prisma
 /k8s/manifests/secret.yml
 /explanations/*
+
+.vercel
+.env*
