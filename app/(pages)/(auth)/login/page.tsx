@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import PasswordInput from "@/app/components/ui/password-input";
 import AuthShell from "../../../components/auth-shell";
 
 export default function LoginPage() {
@@ -83,14 +84,12 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-emerald-300/60 focus:bg-white/[0.07]"
           />
         </div>
 

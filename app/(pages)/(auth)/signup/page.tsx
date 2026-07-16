@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import AuthShell from "../../../components/auth-shell";
+import PasswordInput from "@/app/components/ui/password-input";
 import { signupAction } from "@/app/actions/signup";
 
 export default function SignupPage() {
@@ -106,14 +107,12 @@ export default function SignupPage() {
           >
             Password
           </label>
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
-            placeholder="Create a password"
+            placeholder="Set your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-emerald-300/60 focus:bg-white/[0.07]"
           />
         </div>
 
@@ -124,14 +123,12 @@ export default function SignupPage() {
           >
             Confirm password
           </label>
-          <input
+          <PasswordInput
             id="confirmPassword"
             name="confirmPassword"
-            type="password"
             placeholder="Re-enter your password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-emerald-300/60 focus:bg-white/[0.07]"
           />
         </div>
 
