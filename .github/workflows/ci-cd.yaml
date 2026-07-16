@@ -9,18 +9,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & Push Docker Image
         run: |
-          docker build -t niruth4405/tenora-ai:${{ github.sha }} .
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u niruth4405 --password-stdin
-          docker push niruth4405/tenora-ai:${{ github.sha }}
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/tenora:${{ github.sha }} .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/tenora:${{ github.sha }}
 
       - name: Update Image Tag in K8s Manifest
         run: |
-          sed -i "s|image: niruth4405/tenora-ai:.*|image: niruth4405/tenora-ai:${{ github.sha }}|g" k8s/deployment.yaml
+          sed -i "s|image: .*tenora:.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/tenora:${{ github.sha }}|g" k8s/manifests/deployment.yml
           git config user.email "ci@github.com"
           git config user.name "GitHub Actions"
-          git add k8s/deployment.yaml
+          git add k8s/manifests/deployment.yml
           git commit -m "ci: update image tag to ${{ github.sha }}"
           git push
