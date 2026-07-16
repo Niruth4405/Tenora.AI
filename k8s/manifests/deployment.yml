@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: tenora-app
-        image: niruth03/tenora:v1.0.0    # pinned tag, NOT :latest
+        image: niruth03/tenora:a9361e63d5633f8fcb3db5e592bbe1e2ad84ddf0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
