@@ -1,0 +1,8 @@
+# helm/tenora-chart/Chart.yaml
+apiVersion: v2
+name: tenora-chart
+description: Helm chart for Tenora.AI - Content Engine SaaS
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+icon: https://raw.githubusercontent.com/Niruth4405/Tenora.AI/master/public/favicon.ico

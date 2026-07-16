@@ -1,0 +1,29 @@
+# helm/tenora-chart/values.yaml
+replicaCount: 3
+
+image:
+  repository: niruth03/tenora
+  tag: "v1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  host: tenora.yourdomain.com
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+namespace: tenora
+
+secretName: tenora-secrets
+
