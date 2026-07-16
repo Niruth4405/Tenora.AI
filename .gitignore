@@ -44,7 +44,7 @@ next-env.d.ts
 /k8s/manifests/secret.yml
 /explanations/*
 helm/tenora-chart/templates/values.secret.yml
-values.secret.yml
+values-secret.yml
 
 .vercel
 .env*

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tenora-ai
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Niruth4405/Tenora.AI
+    targetRevision: master
+    path: k8s          # or helm/ if using Helm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tenora-ai
+  syncPolicy:
+    automated:
+      prune: true       # removes resources deleted from Git
+      selfHeal: true    # reverts manual cluster changes
+    syncOptions:
+      - CreateNamespace=true
