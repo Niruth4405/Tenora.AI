@@ -23,6 +23,7 @@ jobs:
           sed -i "s|image: .*tenora:.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/tenora:${{ github.sha }}|g" k8s/manifests/deployment.yml
           git config user.email "ci@github.com"
           git config user.name "GitHub Actions"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Niruth4405/Tenora.AI.git
           git add k8s/manifests/deployment.yml
           git commit -m "ci: update image tag to ${{ github.sha }}"
           git push
