@@ -3,7 +3,7 @@ replicaCount: 3
 
 image:
   repository: niruth03/tenora
-  tag: "v1.0.0"
+  tag: "<commit-sha-or-release-tag>"
   pullPolicy: IfNotPresent
 
 service:
