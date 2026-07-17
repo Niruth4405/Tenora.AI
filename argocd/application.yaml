@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/Niruth4405/Tenora.AI
     targetRevision: master
-    path: k8s          # or helm/ if using Helm
+    path: helm/tenora-chart          # or helm/ if using Helm
   destination:
     server: https://kubernetes.default.svc
     namespace: tenora-ai
