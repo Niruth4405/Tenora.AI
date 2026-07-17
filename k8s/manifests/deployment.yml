@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: tenora-app
-        image: niruth03/tenora:b5eae4cf6e99a1a1c3e19819e5947b30985e9bce
+        image: niruth03/tenora:92c067929c27ba5b69a78ddfdabc5e24678c94cc
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
