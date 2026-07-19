@@ -3,8 +3,8 @@ replicaCount: 3
 
 image:
   repository: niruth03/tenora
-  tag: "<commit-sha-or-release-tag>"
-  pullPolicy: IfNotPresent
+  tag: "latest"
+  pullPolicy: Always
 
 service:
   type: ClusterIP
@@ -23,7 +23,7 @@ resources:
     cpu: "500m"
     memory: "512Mi"
 
-namespace: tenora
+namespace: tenora-ai
 
 secretName: tenora-secrets
 
